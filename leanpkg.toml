@@ -1,0 +1,8 @@
+[package]
+name = "dimension_theory"
+version = "0.1"
+lean_version = "leanprover-community/lean:3.50.3"
+path = "src"
+
+[dependencies]
+mathlib = {git = "https://github.com/leanprover-community/mathlib", rev = "4601791ea62fea875b488dafc4e6dede19e8363f"}
