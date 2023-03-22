@@ -5,6 +5,9 @@ noncomputable theory
 
 variables (R : Type*) [comm_ring R]
 
+/--
+
+-/
 structure prime_ideal_chain :=
 (len : ℕ)
 (chain : fin (len + 1) → ideal R)
@@ -12,23 +15,6 @@ structure prime_ideal_chain :=
 [is_prime : ∀ i, (chain i).is_prime]
 
 namespace prime_ideal_chain
-
-@[ext]
-lemma ext (M N : prime_ideal_chain R)
-  (len_eq : M.len = N.len)
-  (chain_eq : ∀ (i : fin (M.len + 1)), M.chain i = N.chain i) : 
-  M = N := 
-begin 
-  cases M with M_len M_chain M_is_chain M_is_prime,
-  cases N with N_len N_chain N_is_chain N_is_prime,
-  dsimp at *,
-  induction len_eq,
-  congr,
-  ext : 1,
-  rw chain_eq,
-  congr,
-  norm_num,
-end
 
 instance [nontrivial R] : nonempty (prime_ideal_chain R) :=
 nonempty.intro 
@@ -44,6 +30,21 @@ instance [nontrivial R] : inhabited (prime_ideal_chain R) :=
     is_chain := by { rintros ⟨i, (hi : i < 1)⟩ ⟨j, (hj : j < 1)⟩ (hij : i < j), exfalso, linarith, },
     is_prime := λ _, (ideal.exists_maximal R).some_spec.is_prime } }
 
+@[ext]
+lemma ext (M N : prime_ideal_chain R)
+(len_eq : M.len = N.len)
+(chain_eq : ∀ (i : fin (M.len + 1)), M.chain i = N.chain i) :
+M = N :=
+begin
+cases M with h l m,
+cases N with h' l' m',
+dsimp at *,
+subst len_eq,
+congr,
+ext,
+rw chain_eq,
+norm_num,
+end
 
 end prime_ideal_chain
 
@@ -76,7 +77,7 @@ lemma finite_dimensional_ring.iff_len_bounded [nontrivial R] :
 variable [decidable $ finite_dimensional_ring R]
 
 def krull_dim : ℕ := 
-if H : finite_dimensional_ring R 
+if H : finite_dimensional_ring R
 then H.fin_dim.some.len
 else 0
 
@@ -142,3 +143,19 @@ krull_dim (localization.at_prime p)
 example (p : ideal R) [p.is_prime] : ℕ := p.height
 
 end height
+
+open_locale classical
+
+def maximal_chain (S : Type*) [comm_ring S] [finite_dimensional_ring S] : prime_ideal_chain S :=
+finite_dimensional_ring.fin_dim.some
+
+def maximal_chain_wit (S : Type*) [comm_ring S] [finite_dimensional_ring S] : ∀ (N : prime_ideal_chain S), N.len ≤ (maximal_chain S).len:=
+finite_dimensional_ring.fin_dim.some_spec
+
+
+
+theorem subring_finite_dim (S : subring R) (H : finite_dimensional_ring S) (H1 : finite_dimensional_ring R) : krull_dim S ≤ krull_dim R :=
+begin
+unfreezingI { cases H with a b },
+
+end
