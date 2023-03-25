@@ -17,7 +17,7 @@ structure prime_ideal_chain :=
 namespace prime_ideal_chain
 
 instance [nontrivial R] : nonempty (prime_ideal_chain R) :=
-nonempty.intro 
+nonempty.intro
 { len := 0,
   chain := λ _, (ideal.exists_maximal R).some,
   is_chain := by { rintros ⟨i, (hi : i < 1)⟩ ⟨j, (hj : j < 1)⟩ (hij : i < j), exfalso, linarith, },
@@ -132,6 +132,52 @@ begin
   apply maximal_chain_is_maximal,
 end
 
+
+theorem all_chain_length_bounded [finite_dimensional_ring R] 
+  (S : Type*) [comm_ring S] [nontrivial S]
+  (f : R →+* S) (hf : function.surjective f) : ∀ (N : prime_ideal_chain S), N.len ≤ krull_dim R :=
+begin
+  intros N,
+  let N' : prime_ideal_chain R := 
+  { len := N.len,
+    chain := λ j, (N.chain j).comap f,
+    is_chain := λ i j h, begin 
+      dsimp,
+      rw lt_iff_le_and_ne,
+      split,
+      { refine ideal.comap_mono _,
+        refine le_of_lt (N.is_chain h), },
+      { have neq := ne_of_lt (N.is_chain h),
+        contrapose! neq,
+        ext1 s,
+        obtain ⟨r, rfl⟩:= hf s,
+        rw [← ideal.mem_comap, neq, ideal.mem_comap], },
+    end,
+    is_prime := λ j, begin
+      haveI := N.is_prime j,
+      refine ideal.comap_is_prime _ _,
+    end },
+  rw [show N.len = N'.len, from rfl, krull_dim_eq_len],
+  apply maximal_chain_is_maximal,
+end
+
+
+
+open_locale classical
+
+theorem krull_dim_bounded [finite_dimensional_ring R]
+  (S : Type*) [comm_ring S] [ nontrivial S]
+  (f : R →+* S) (hf : function.surjective f) : krull_dim S ≤ krull_dim R :=
+begin
+  haveI : finite_dimensional_ring S,
+    exact finite_dimensional_of_surj R S f hf,
+  rw krull_dim_eq_len,
+  exact all_chain_length_bounded R S f hf (maximal_chain S),
+end
+
+
+
+
 section height
 
 variables {R} 
@@ -143,19 +189,3 @@ krull_dim (localization.at_prime p)
 example (p : ideal R) [p.is_prime] : ℕ := p.height
 
 end height
-
-open_locale classical
-
-def maximal_chain (S : Type*) [comm_ring S] [finite_dimensional_ring S] : prime_ideal_chain S :=
-finite_dimensional_ring.fin_dim.some
-
-def maximal_chain_wit (S : Type*) [comm_ring S] [finite_dimensional_ring S] : ∀ (N : prime_ideal_chain S), N.len ≤ (maximal_chain S).len:=
-finite_dimensional_ring.fin_dim.some_spec
-
-
-
-theorem subring_finite_dim (S : subring R) (H : finite_dimensional_ring S) (H1 : finite_dimensional_ring R) : krull_dim S ≤ krull_dim R :=
-begin
-unfreezingI { cases H with a b },
-
-end
