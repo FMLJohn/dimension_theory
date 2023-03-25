@@ -162,7 +162,6 @@ begin
 end
 
 
-
 open_locale classical
 
 theorem krull_dim_bounded [finite_dimensional_ring R]
@@ -174,7 +173,6 @@ begin
   rw krull_dim_eq_len,
   exact all_chain_length_bounded R S f hf (maximal_chain S),
 end
-
 
 
 
