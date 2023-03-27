@@ -6,7 +6,7 @@ noncomputable theory
 variables (R : Type*) [comm_ring R]
 
 /--
-
+a chain of prime ideal of length `n` is `𝔭₀ ⊂ 𝔭₁ ⊂ ... ⊂ 𝔭ₙ` where all `𝔭ᵢ`s are prime ideals.
 -/
 structure prime_ideal_chain :=
 (len : ℕ)
@@ -16,6 +16,10 @@ structure prime_ideal_chain :=
 
 namespace prime_ideal_chain
 
+/--
+If `R` is not the zero ring, then there is at least one prime ideal chain for `R` has a maximal 
+ideal.
+-/
 instance [nontrivial R] : nonempty (prime_ideal_chain R) :=
 nonempty.intro
 { len := 0,
@@ -30,6 +34,9 @@ instance [nontrivial R] : inhabited (prime_ideal_chain R) :=
     is_chain := by { rintros ⟨i, (hi : i < 1)⟩ ⟨j, (hj : j < 1)⟩ (hij : i < j), exfalso, linarith, },
     is_prime := λ _, (ideal.exists_maximal R).some_spec.is_prime } }
 
+/--
+Two prime ideal chains are equal when they have the same length and the same prime ideals.
+-/
 @[ext]
 lemma ext (M N : prime_ideal_chain R)
 (len_eq : M.len = N.len)
@@ -48,10 +55,18 @@ end
 
 end prime_ideal_chain
 
-
+/--
+A ring `R` is said to be finite dimensional if there is a prime ideal chain with the maximal length.
+Note that according to this definition, the zero ring is not finite dimensional, for it has no prime
+ideal chains.
+-/
 class finite_dimensional_ring : Prop :=
 (fin_dim : ∃ (M : prime_ideal_chain R), ∀ (N : prime_ideal_chain R), N.len ≤ M.len)
 
+/--
+If `R` is not the zero ring, then `R` is finite dimensional iff all prime ideal chains of `R` have
+length bounded by some `n ∈ ℕ`
+-/
 lemma finite_dimensional_ring.iff_len_bounded [nontrivial R] : 
   finite_dimensional_ring R ↔ 
   ∃ (n : ℕ), ∀ (N : prime_ideal_chain R), N.len ≤ n :=
@@ -76,11 +91,23 @@ lemma finite_dimensional_ring.iff_len_bounded [nontrivial R] :
 
 variable [decidable $ finite_dimensional_ring R]
 
+/--
+The Krull dimension of a ring is the length of maximal chain if the ring is finite dimensional and 
+0 otherwise.
+
+Notes on implementation:
+alternatively `krull_dim` should take value in `with_top (with_bot ℕ)` where the zero ring then
+would have dimension negative infinity (`⊥`) and any infinite dimensional ring will have dimension 
+positive infinity (`⊤`).
+-/
 def krull_dim : ℕ := 
 if H : finite_dimensional_ring R
 then H.fin_dim.some.len
 else 0
 
+/--
+If `R` is finite dimensional, then it has a prime ideal chain with the greatest length.
+-/
 def maximal_chain [finite_dimensional_ring R] : prime_ideal_chain R :=
 finite_dimensional_ring.fin_dim.some
 
@@ -88,28 +115,35 @@ lemma maximal_chain_is_maximal [finite_dimensional_ring R] (M : prime_ideal_chai
   M.len ≤ (maximal_chain R).len :=
 finite_dimensional_ring.fin_dim.some_spec M
 
-def krull_dim_eq_len [finite_dimensional_ring R] : krull_dim R = (maximal_chain R).len :=
+/--
+If `R` is finite dimensional, then its dimension is the length of the longest prime ideal chain.
+-/
+lemma krull_dim_eq_len [finite_dimensional_ring R] : krull_dim R = (maximal_chain R).len :=
 begin 
   dunfold krull_dim,
   split_ifs,
   refl,
 end
 
-def krull_dim_eq_zero (not_finite : ¬ finite_dimensional_ring R) : krull_dim R = 0 :=
+/--
+If `R` is infinite dimensional, then its dimension, according to our convention, is zero.
+-/
+lemma krull_dim_eq_zero (not_finite : ¬ finite_dimensional_ring R) : krull_dim R = 0 :=
 begin 
   dunfold krull_dim,
   split_ifs,
   refl,
 end
 
+section
 
-theorem all_chain_length_bounded [finite_dimensional_ring R] 
-  (S : Type*) [comm_ring S] [nontrivial S]
-  (f : R →+* S) (hf : function.surjective f) : ∀ (N : prime_ideal_chain S), N.len ≤ krull_dim R :=
-begin
-  intro N,
-  let N' : prime_ideal_chain R := 
-  { len := N.len,
+variables {R}
+
+@[simps]
+def prime_ideal_chain.comap {S : Type*} [comm_ring S] [nontrivial S] 
+  (N : prime_ideal_chain S) [finite_dimensional_ring R] 
+  (f : R →+* S) (hf : function.surjective f) : prime_ideal_chain R :=
+{ len := N.len,
     chain := λ j, (N.chain j).comap f,
     is_chain := λ i j h, begin 
       dsimp,
@@ -126,32 +160,48 @@ begin
     is_prime := λ j, begin
       haveI := N.is_prime j,
       refine ideal.comap_is_prime _ _,
-    end },
-  rw [show N.len = N'.len, from rfl, krull_dim_eq_len],
+    end }
+
+end
+
+/--
+If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, then every prime ideal
+chain of `S` has length at most `krull_dim R` 
+-/
+theorem all_chain_length_bounded [finite_dimensional_ring R] 
+  (S : Type*) [comm_ring S] [nontrivial S]
+  (f : R →+* S) (hf : function.surjective f) : 
+  ∀ (N : prime_ideal_chain S), N.len ≤ krull_dim R :=
+begin
+  intro N,
+  rw [show N.len = (N.comap f hf).len, from rfl, krull_dim_eq_len],
   apply maximal_chain_is_maximal,
 end
 
-
+/--
+If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, then `S` is finite
+dimensional as well.
+-/
 instance finite_dimensional_of_surj [finite_dimensional_ring R] 
   (S : Type*) [comm_ring S] [nontrivial S]
   (f : R →+* S) (hf : function.surjective f) : finite_dimensional_ring S :=
 begin
   rw finite_dimensional_ring.iff_len_bounded,
-  refine ⟨krull_dim R, _⟩,
-  intro N,
-  exact all_chain_length_bounded R S f hf N,
+  exact ⟨krull_dim R, λ N, all_chain_length_bounded R S f hf N⟩,
 end
 
 
 open_locale classical
 
-
+/--
+If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, 
+then `krull_dim S ≤ krull_dim R`.
+-/
 theorem krull_dim_bounded [finite_dimensional_ring R]
   (S : Type*) [comm_ring S] [ nontrivial S]
   (f : R →+* S) (hf : function.surjective f) : krull_dim S ≤ krull_dim R :=
 begin
-  haveI : finite_dimensional_ring S,
-    exact finite_dimensional_of_surj R S f hf,
+  haveI : finite_dimensional_ring S := finite_dimensional_of_surj R S f hf,
   rw krull_dim_eq_len,
   exact all_chain_length_bounded R S f hf (maximal_chain S),
 end
@@ -162,6 +212,9 @@ section height
 variables {R} 
 variable [∀ (p : ideal R) [hp : p.is_prime], decidable $ finite_dimensional_ring (localization.at_prime p)]
 
+/--
+The height of a prime ideal `𝔭` is defined to be `krull_dim R_𝔭`
+-/
 def ideal.height (p : ideal R) [p.is_prime] : ℕ :=
 krull_dim (localization.at_prime p)
 
