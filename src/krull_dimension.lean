@@ -89,8 +89,6 @@ lemma finite_dimensional_ring.iff_len_bounded [nontrivial R] :
       end⟩ } }
 
 
-variable [decidable $ finite_dimensional_ring R]
-
 /--
 The Krull dimension of a ring is the length of maximal chain if the ring is finite dimensional and 
 0 otherwise.
@@ -101,9 +99,7 @@ would have dimension negative infinity (`⊥`) and any infinite dimensional ring
 positive infinity (`⊤`).
 -/
 def krull_dim : ℕ := 
-if H : finite_dimensional_ring R
-then H.fin_dim.some.len
-else 0
+@@dite (finite_dimensional_ring R) (classical.dec _) (λ H, H.fin_dim.some.len) (λ _, 0)
 
 /--
 If `R` is finite dimensional, then it has a prime ideal chain with the greatest length.
@@ -162,20 +158,20 @@ def prime_ideal_chain.comap {S : Type*} [comm_ring S] [nontrivial S]
       refine ideal.comap_is_prime _ _,
     end }
 
-end
 
 /--
 If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, then every prime ideal
 chain of `S` has length at most `krull_dim R` 
 -/
-theorem all_chain_length_bounded [finite_dimensional_ring R] 
-  (S : Type*) [comm_ring S] [nontrivial S]
+theorem prime_ideal_chain.length_bounded {S : Type*} [comm_ring S] [nontrivial S]
+  (N : prime_ideal_chain S) [finite_dimensional_ring R]
   (f : R →+* S) (hf : function.surjective f) : 
-  ∀ (N : prime_ideal_chain S), N.len ≤ krull_dim R :=
+  N.len ≤ krull_dim R :=
 begin
-  intro N,
   rw [show N.len = (N.comap f hf).len, from rfl, krull_dim_eq_len],
   apply maximal_chain_is_maximal,
+end
+
 end
 
 /--
@@ -187,30 +183,26 @@ instance finite_dimensional_of_surj [finite_dimensional_ring R]
   (f : R →+* S) (hf : function.surjective f) : finite_dimensional_ring S :=
 begin
   rw finite_dimensional_ring.iff_len_bounded,
-  exact ⟨krull_dim R, λ N, all_chain_length_bounded R S f hf N⟩,
+  exact ⟨krull_dim R, λ N, N.length_bounded f hf ⟩,
 end
-
-
-open_locale classical
 
 /--
 If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, 
 then `krull_dim S ≤ krull_dim R`.
 -/
 theorem krull_dim_bounded [finite_dimensional_ring R]
-  (S : Type*) [comm_ring S] [ nontrivial S]
+  (S : Type*) [comm_ring S] [nontrivial S]
   (f : R →+* S) (hf : function.surjective f) : krull_dim S ≤ krull_dim R :=
 begin
   haveI : finite_dimensional_ring S := finite_dimensional_of_surj R S f hf,
   rw krull_dim_eq_len,
-  exact all_chain_length_bounded R S f hf (maximal_chain S),
+  exact (maximal_chain S).length_bounded f hf ,
 end
 
 
 section height
 
 variables {R} 
-variable [∀ (p : ideal R) [hp : p.is_prime], decidable $ finite_dimensional_ring (localization.at_prime p)]
 
 /--
 The height of a prime ideal `𝔭` is defined to be `krull_dim R_𝔭`
