@@ -102,42 +102,12 @@ begin
   refl,
 end
 
-instance finite_dimensional_of_surj [finite_dimensional_ring R] 
-  (S : Type*) [comm_ring S] [nontrivial S]
-  (f : R →+* S) (hf : function.surjective f) : finite_dimensional_ring S :=
-begin
-  rw finite_dimensional_ring.iff_len_bounded,
-  refine ⟨krull_dim R, _⟩,
-  intros N,
-  let N' : prime_ideal_chain R := 
-  { len := N.len, 
-    chain := λ j, (N.chain j).comap f, 
-    is_chain := λ i j h, begin 
-      dsimp,
-      rw lt_iff_le_and_ne,
-      split,
-      { refine ideal.comap_mono _,
-        refine le_of_lt (N.is_chain h), },
-      { have neq := ne_of_lt (N.is_chain h),
-        contrapose! neq,
-        ext1 s,
-        obtain ⟨r, rfl⟩:= hf s,
-        rw [← ideal.mem_comap, neq, ideal.mem_comap], },
-    end, 
-    is_prime := λ j, begin 
-      haveI := N.is_prime j,
-      refine ideal.comap_is_prime _ _,
-    end },
-  rw [show N.len = N'.len, from rfl, krull_dim_eq_len],
-  apply maximal_chain_is_maximal,
-end
-
 
 theorem all_chain_length_bounded [finite_dimensional_ring R] 
   (S : Type*) [comm_ring S] [nontrivial S]
   (f : R →+* S) (hf : function.surjective f) : ∀ (N : prime_ideal_chain S), N.len ≤ krull_dim R :=
 begin
-  intros N,
+  intro N,
   let N' : prime_ideal_chain R := 
   { len := N.len,
     chain := λ j, (N.chain j).comap f,
@@ -162,7 +132,19 @@ begin
 end
 
 
+instance finite_dimensional_of_surj [finite_dimensional_ring R] 
+  (S : Type*) [comm_ring S] [nontrivial S]
+  (f : R →+* S) (hf : function.surjective f) : finite_dimensional_ring S :=
+begin
+  rw finite_dimensional_ring.iff_len_bounded,
+  refine ⟨krull_dim R, _⟩,
+  intro N,
+  exact all_chain_length_bounded R S f hf N,
+end
+
+
 open_locale classical
+
 
 theorem krull_dim_bounded [finite_dimensional_ring R]
   (S : Type*) [comm_ring S] [ nontrivial S]
@@ -173,7 +155,6 @@ begin
   rw krull_dim_eq_len,
   exact all_chain_length_bounded R S f hf (maximal_chain S),
 end
-
 
 
 section height
