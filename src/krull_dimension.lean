@@ -92,7 +92,6 @@ lemma finite_dimensional_ring.iff_len_bounded [nontrivial R] :
 /--
 The Krull dimension of a ring is the length of maximal chain if the ring is finite dimensional and 
 0 otherwise.
-
 Notes on implementation:
 alternatively `krull_dim` should take value in `with_top (with_bot ℕ)` where the zero ring then
 would have dimension negative infinity (`⊥`) and any infinite dimensional ring will have dimension 
@@ -190,13 +189,23 @@ end
 If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, 
 then `krull_dim S ≤ krull_dim R`.
 -/
-theorem krull_dim_bounded [finite_dimensional_ring R]
+theorem krull_dim_le_of_surj [finite_dimensional_ring R]
   (S : Type*) [comm_ring S] [nontrivial S]
   (f : R →+* S) (hf : function.surjective f) : krull_dim S ≤ krull_dim R :=
 begin
   haveI : finite_dimensional_ring S := finite_dimensional_of_surj R S f hf,
   rw krull_dim_eq_len,
-  exact (maximal_chain S).length_bounded f hf ,
+  exact (maximal_chain S).length_bounded f hf,
+end
+
+/--
+If `R` is finite dimensional and `I` is an ideal of `R`,
+then `krull_dim (R ⧸ I) ≤ krull_dim R`.
+-/
+theorem krull_dim_le_of_quot [finite_dimensional_ring R] (I : ideal R) [nontrivial (R ⧸ I)] : krull_dim (R ⧸ I) ≤ krull_dim R :=
+begin
+  haveI : finite_dimensional_ring (R ⧸ I) := finite_dimensional_of_surj R (R ⧸ I) (ideal.quotient.mk I) ideal.quotient.mk_surjective,
+  exact krull_dim_le_of_surj _ _ (ideal.quotient.mk I) ideal.quotient.mk_surjective,
 end
 
 
