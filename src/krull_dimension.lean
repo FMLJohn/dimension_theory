@@ -134,9 +134,11 @@ section
 
 variables {R}
 
-@[simps]
-def prime_ideal_chain.comap {S : Type*} [comm_ring S] [nontrivial S] 
-  (N : prime_ideal_chain S) [finite_dimensional_ring R] 
+/--
+Pulling back a chain of prime ideal chain of `S` along a surjective ring homomorphism `f : R ⟶ S`
+to obtain a prime idael chain of `R` by `𝔭ᵢ ↦ f⁻¹ 𝔭ᵢ`.
+-/
+@[simps] def prime_ideal_chain.comap {S : Type*} [comm_ring S] (N : prime_ideal_chain S)
   (f : R →+* S) (hf : function.surjective f) : prime_ideal_chain R :=
 { len := N.len,
     chain := λ j, (N.chain j).comap f,
@@ -162,7 +164,7 @@ def prime_ideal_chain.comap {S : Type*} [comm_ring S] [nontrivial S]
 If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, then every prime ideal
 chain of `S` has length at most `krull_dim R` 
 -/
-theorem prime_ideal_chain.length_bounded {S : Type*} [comm_ring S] [nontrivial S]
+theorem prime_ideal_chain.length_bounded {S : Type*} [comm_ring S]
   (N : prime_ideal_chain S) [finite_dimensional_ring R]
   (f : R →+* S) (hf : function.surjective f) : 
   N.len ≤ krull_dim R :=
@@ -177,7 +179,7 @@ end
 If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, then `S` is finite
 dimensional as well.
 -/
-instance finite_dimensional_of_surj [finite_dimensional_ring R] 
+lemma finite_dimensional_of_surj [finite_dimensional_ring R] 
   (S : Type*) [comm_ring S] [nontrivial S]
   (f : R →+* S) (hf : function.surjective f) : finite_dimensional_ring S :=
 begin
@@ -202,9 +204,11 @@ end
 If `R` is finite dimensional and `I` is an ideal of `R`,
 then `krull_dim (R ⧸ I) ≤ krull_dim R`.
 -/
-theorem krull_dim_le_of_quot [finite_dimensional_ring R] (I : ideal R) [nontrivial (R ⧸ I)] : krull_dim (R ⧸ I) ≤ krull_dim R :=
+theorem krull_dim_le_of_quot [finite_dimensional_ring R] (I : ideal R) [nontrivial (R ⧸ I)] : 
+  krull_dim (R ⧸ I) ≤ krull_dim R :=
 begin
-  haveI : finite_dimensional_ring (R ⧸ I) := finite_dimensional_of_surj R (R ⧸ I) (ideal.quotient.mk I) ideal.quotient.mk_surjective,
+  haveI : finite_dimensional_ring (R ⧸ I) := 
+    finite_dimensional_of_surj R (R ⧸ I) (ideal.quotient.mk I) ideal.quotient.mk_surjective,
   exact krull_dim_le_of_surj _ _ (ideal.quotient.mk I) ideal.quotient.mk_surjective,
 end
 
