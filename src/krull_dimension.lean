@@ -1,6 +1,5 @@
 import ring_theory.ideal.basic
 import ring_theory.localization.at_prime
-import algebraic_geometry.prime_spectrum.basic
 
 noncomputable theory
 
@@ -135,9 +134,11 @@ section
 
 variables {R}
 
-@[simps]
-def prime_ideal_chain.comap {S : Type*} [comm_ring S] [nontrivial S] 
-  (N : prime_ideal_chain S) [finite_dimensional_ring R] 
+/--
+Pulling back a chain of prime ideal chain of `S` along a surjective ring homomorphism `f : R ⟶ S`
+to obtain a prime idael chain of `R` by `𝔭ᵢ ↦ f⁻¹ 𝔭ᵢ`.
+-/
+@[simps] def prime_ideal_chain.comap {S : Type*} [comm_ring S] (N : prime_ideal_chain S)
   (f : R →+* S) (hf : function.surjective f) : prime_ideal_chain R :=
 { len := N.len,
     chain := λ j, (N.chain j).comap f,
@@ -163,7 +164,7 @@ def prime_ideal_chain.comap {S : Type*} [comm_ring S] [nontrivial S]
 If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, then every prime ideal
 chain of `S` has length at most `krull_dim R` 
 -/
-theorem prime_ideal_chain.length_bounded {S : Type*} [comm_ring S] [nontrivial S]
+theorem prime_ideal_chain.length_bounded {S : Type*} [comm_ring S]
   (N : prime_ideal_chain S) [finite_dimensional_ring R]
   (f : R →+* S) (hf : function.surjective f) : 
   N.len ≤ krull_dim R :=
@@ -315,18 +316,15 @@ begin
 end
 
 /--
-If `R` is finite dimensional, `I` is an ideal of `R`, and `R ⧸ I`
-is nontrivial, then `krull_dim (R ⧸ I) ≤ krull_dim R`.
+If `R` is finite dimensional, `I` is an ideal of `R`, and `R ⧸ I` is
+nontrivial, then `krull_dim (R ⧸ I) ≤ krull_dim R`.
 -/
-theorem krull_dim_le_of_quot [finite_dimensional_ring R]
-  (I : ideal R) [nontrivial (R ⧸ I)] :
+theorem krull_dim_le_of_quot [finite_dimensional_ring R] (I : ideal R) [nontrivial (R ⧸ I)] : 
   krull_dim (R ⧸ I) ≤ krull_dim R :=
 begin
-  haveI : finite_dimensional_ring (R ⧸ I) :=
-    finite_dimensional_of_surj R (R ⧸ I) (ideal.quotient.mk I)
-    ideal.quotient.mk_surjective,
-  exact krull_dim_le_of_surj _ _ (ideal.quotient.mk I)
-  ideal.quotient.mk_surjective,
+  haveI : finite_dimensional_ring (R ⧸ I) := 
+    finite_dimensional_of_surj R (R ⧸ I) (ideal.quotient.mk I) ideal.quotient.mk_surjective,
+  exact krull_dim_le_of_surj _ _ (ideal.quotient.mk I) ideal.quotient.mk_surjective,
 end
 
 
@@ -341,26 +339,5 @@ def ideal.height (p : ideal R) [p.is_prime] : ℕ :=
 krull_dim (localization.at_prime p)
 
 example (p : ideal R) [p.is_prime] : ℕ := p.height
-
-def prime_spectrum.height (p : prime_spectrum R) : ℕ :=
-krull_dim (localization.at_prime p.as_ideal)
-
-
-/- lemma krull_dim_le_of_localization
-  [nontrivial R] [finite_dimensional_ring R]
-  (I : ideal R) [I.is_prime]
-  (N : prime_ideal_chain (localization.at_prime I)):
-  N.len ≤ krull_dim R :=
-begin
-  have h : ∃ (M : prime_ideal_chain R), M.len = N.len,
-end -/
-
--- theorem krull_dim_eq_Sup [finite_dimensional_ring R] : krull_dim R = Sup { n | ∃ (I : prime_spectrum R), (n = I.height) } := sorry
-
-/- theorem krull_dim_eq_sup [finite_dimensional_ring R] : krull_dim R = 
-  Sup (set.range (@prime_spectrum.height R _)) := sorry -/
-
-/- theorem krull_dim_eq_sup' [finite_dimensional_ring R] : krull_dim R = 
-  ⨆ (x : prime_spectrum R), x.height := sorry -/
 
 end height
