@@ -11,16 +11,21 @@ import ring_theory.ideal.basic
 General theory
 
 - `f : α → β` is strictly monotonic, then `krull_dim α ≤ krull_dim β` (*) [`strict_chain.map`pushforward];
+  - almost finished
 - `f : α → β` is strictly comonotonic and surjective, then `krull_dim β ≤ krull_dim α` [`strict_chain.comap`pullback];
-- (*) imply `R ⟶ S` surjective homomorphism, then `dim S ≤ dim R`;
 - `height` makes sense for any preodered set
+- `krull_nat_dim` : works for "finite_dim" `[order_top (chain α)]`, `α → ℕ`.
+- `krull_nat_dim = krull_dim` when finite dimensional
 
 -------
 Theory needs to take place in `Top, Ring, Module` Concerte
+- (*) imply `R ⟶ S` surjective homomorphism, then `dim S ≤ dim R`;
 - need to show `height 𝔭 = krull_dim (localizaiton.at_prime 𝔭)`
 - `coheight` probably doesn't make sense in general preorder
 - `height 𝔭 + coheight 𝔭 ≤ krull_dim R`
 
+Important but far away
+- If `R` is noetherian and local, then `R` is finite dimensional.
 -/
 
 noncomputable theory
@@ -30,6 +35,15 @@ variables (α β : Type*)
 section preorder
 
 variables [preorder α] [preorder β]
+
+section strict_comono
+
+variables {α β}
+
+def strict_comono (f : α → β) : Prop :=
+∀ ⦃a b⦄, f a < f b → a < b
+
+end strict_comono
 
 structure strict_chain :=
 (len : ℕ)
@@ -82,6 +96,13 @@ def map (p : strict_chain α) (f : α → β) (hf : strict_mono f) : strict_chai
 { len := p.len,
   func := f.comp p,
   strict_mono' := hf.comp p.strict_mono' }
+
+@[simps]
+def comap (p : strict_chain β) (f : α → β) (hf1 : strict_comono f) (hf2 : function.surjective f) :
+  strict_chain α :=
+{ len := p.len,
+  func := sorry,
+  strict_mono' := sorry }
 
 lemma exists_len_gt_of_infinite_dim [no_top_order (strict_chain α)] [H : nonempty α] (n : ℕ) : 
   ∃ (p : strict_chain α), n < p.len :=
