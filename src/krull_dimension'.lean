@@ -101,8 +101,13 @@ def map (p : strict_chain α) (f : α → β) (hf : strict_mono f) : strict_chai
 def comap (p : strict_chain β) (f : α → β) (hf1 : strict_comono f) (hf2 : function.surjective f) :
   strict_chain α :=
 { len := p.len,
-  func := sorry,
-  strict_mono' := sorry }
+  func := λ i, (hf2 (p.func i)).some,
+  strict_mono' := λ i j h, begin
+      have h' : f (hf2 (p.func i)).some < f (hf2 (p.func j)).some,
+        rw [(hf2 (p.func i)).some_spec, (hf2 (p.func j)).some_spec],
+        exact p.strict_mono' h,
+      exact hf1 h',
+    end}
 
 lemma exists_len_gt_of_infinite_dim [no_top_order (strict_chain α)] [H : nonempty α] (n : ℕ) : 
   ∃ (p : strict_chain α), n < p.len :=
@@ -171,7 +176,7 @@ lemma krull_dim_eq_len_of_is_top [order_top (strict_chain α)] (p : strict_chain
   krull_dim α = p.len :=
 by rw [krull_dim_eq_len_of_order_top, (strict_chain.top_len_unique _ p hp).symm]
 
-lemma krull_dim_le_of_inj [decidable $ is_empty α] [decidable $ is_empty β] 
+lemma krull_dim_le_of_strict_mono [decidable $ is_empty α] [decidable $ is_empty β] 
   (f : α → β) (f : strict_mono f) : krull_dim α ≤ krull_dim β :=
 sorry
 
