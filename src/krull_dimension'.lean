@@ -176,8 +176,19 @@ lemma krull_dim_eq_len_of_is_top [order_top (strict_chain α)] (p : strict_chain
   krull_dim α = p.len :=
 by rw [krull_dim_eq_len_of_order_top, (strict_chain.top_len_unique _ p hp).symm]
 
-lemma krull_dim_le_of_strict_mono [decidable $ is_empty α] [decidable $ is_empty β] 
-  (f : α → β) (f : strict_mono f) : krull_dim α ≤ krull_dim β :=
+instance no_top_order_of_strict_mono (f : α → β) (hf : strict_mono f) [no_top_order (strict_chain α)]
+  [nonempty α]: (no_top_order (strict_chain β)) :=
+begin
+  fconstructor,
+  intro smb,
+  cases (@strict_chain.exists_len_gt_of_infinite_dim α _ _ _ smb.len) with sma sms,
+  use strict_chain.map sma f hf,
+  rw [strict_chain.le_def, ←lt_iff_not_ge],
+  exact sms,
+end
+
+lemma krull_dim_le_of_strict_mono [decidable $ is_empty α] [decidable $ is_empty β]
+  (f : α → β) (hf : strict_mono f) : krull_dim α ≤ krull_dim β :=
 sorry
 
 #check @function.is_empty
