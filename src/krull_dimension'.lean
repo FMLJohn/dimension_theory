@@ -30,6 +30,8 @@ Important but far away
 
 noncomputable theory
 
+local notation `ℕ±∞` := with_bot (with_top ℕ)
+
 variables (α β : Type*)
 
 section preorder
@@ -79,18 +81,21 @@ instance : preorder (strict_chain α) :=
 instance [is_empty α] : is_empty $ strict_chain α :=
 { false := λ p, @is_empty.elim α (infer_instance : is_empty α) (λ _, false) (p 0) }
 
+instance [inhabited α] : inhabited $ strict_chain α :=
+{ default := ⟨0, λ _, default, λ _ _ h, (ne_of_lt h $ subsingleton.elim _ _).elim⟩ }
+
+instance [nonempty α] : nonempty $ strict_chain α :=
+nonempty.intro ⟨0, λ _, nonempty.some infer_instance, λ _ _ h, (ne_of_lt h $ subsingleton.elim _ _).elim⟩
+
 lemma top_len_unique [order_top (strict_chain α)] (p : strict_chain α) (hp : is_top p) :
   p.len = (⊤ : strict_chain α).len :=
-begin 
-  have ineq1 : (⊤ : strict_chain α).len ≤ p.len := hp ⊤,
-  have ineq2 : p.len ≤ (⊤ : strict_chain α).len := @le_top (strict_chain α) _ _ _,
-  refine le_antisymm ineq2 ineq1,
-end
+le_antisymm (@le_top (strict_chain α) _ _ _) (hp ⊤)
 
 lemma top_len_unique' (H1 H2 : order_top (strict_chain α)) : H1.top.len = H2.top.len :=
 le_antisymm (H2.le_top H1.top) (H1.le_top H2.top)
 
 variables {α β}
+
 @[simps]
 def map (p : strict_chain α) (f : α → β) (hf : strict_mono f) : strict_chain β :=
 { len := p.len,
@@ -101,45 +106,34 @@ def map (p : strict_chain α) (f : α → β) (hf : strict_mono f) : strict_chai
 def comap (p : strict_chain β) (f : α → β) (hf1 : strict_comono f) (hf2 : function.surjective f) :
   strict_chain α :=
 { len := p.len,
-  func := λ i, (hf2 (p.func i)).some,
-  strict_mono' := λ i j h, begin
-      have h' : f (hf2 (p.func i)).some < f (hf2 (p.func j)).some,
-        rw [(hf2 (p.func i)).some_spec, (hf2 (p.func j)).some_spec],
-        exact p.strict_mono' h,
-      exact hf1 h',
-    end}
+  func := λ i, (hf2 (p i)).some,
+  strict_mono' := λ i j h, hf1 (by simpa only [(hf2 _).some_spec] using p.strict_mono' h) }
 
-lemma exists_len_gt_of_infinite_dim [no_top_order (strict_chain α)] [H : nonempty α] (n : ℕ) : 
+variable (α)
+
+lemma exists_len_gt_of_infinite_dim [no_top_order (strict_chain α)] [nonempty α] (n : ℕ) : 
   ∃ (p : strict_chain α), n < p.len :=
 begin
-  let a : α := H.some,
-  set default_chain : strict_chain α := ⟨0, λ p, a, begin 
-    intros a b h,
-    exfalso,
-    exact ne_of_lt h (subsingleton.elim _ _),
-  end⟩ with d_eq, 
+  haveI : inhabited α := classical.inhabited_of_nonempty infer_instance,
   induction n with n ih,
-  { rcases no_top_order.exists_not_le default_chain with ⟨p, hp⟩,
-    simp only [le_def, not_le, d_eq] at hp,
-    exact ⟨p, hp⟩, },
+  { obtain ⟨p, hp⟩ := no_top_order.exists_not_le (default : strict_chain α),
+    refine ⟨p, lt_of_not_le hp⟩, },
   { rcases ih with ⟨p, hp⟩,
     rcases no_top_order.exists_not_le p with ⟨q, hq⟩,
-    use q,
-    rw [le_def, not_le] at hq,
-    rw nat.succ_eq_add_one,
-    linarith, },
+    dsimp [le_def, not_le, nat.succ_eq_add_one] at *,
+    exact ⟨q, by linarith⟩, },
 end
 
 end strict_chain
 
-def krull_dim [decidable (is_empty α)] : with_bot (with_top ℕ) :=
+def krull_dim [decidable (is_empty α)] : ℕ±∞ :=
 psum.cases_on (top_order_or_no_top_order (strict_chain α)) 
 (λ H, H.top.len) 
 (λ H, if is_empty α then ⊥ else ⊤)
 
 variables {α}
 
-def height (a : α) [decidable (is_empty (set.Iic a))] : with_bot (with_top ℕ) :=
+def height (a : α) [decidable (is_empty (set.Iic a))] : ℕ±∞ :=
 krull_dim (set.Iic a)
 
 instance t1 [H : is_empty α] : decidable (is_empty α) :=
@@ -148,17 +142,13 @@ is_true H
 lemma krull_dim_eq_bot_of_is_empty [is_empty α] :
   krull_dim α = ⊥ :=
 begin 
-  rw [krull_dim, show top_order_or_no_top_order (strict_chain α) = psum.inr _, from _],
-  { dsimp only, rw if_pos, apply_instance },
-  { fconstructor, intros a, refine @is_empty.elim (strict_chain α) infer_instance _ a, },
-  { dunfold top_order_or_no_top_order, rw dif_pos, },
+  rwa [krull_dim, show top_order_or_no_top_order (strict_chain α) = 
+    psum.inr ⟨λ a, @is_empty.elim (strict_chain α) infer_instance _ a⟩, from _, if_pos],
+  rw [top_order_or_no_top_order, dif_pos],
 end
 
 instance t2 [order_top (strict_chain α)] : decidable (is_empty α) :=
-is_false begin 
-  rw not_is_empty_iff,
-  refine nonempty.intro ((⊤ : strict_chain α) 0),
-end
+is_false $ not_is_empty_iff.mpr $ nonempty.intro $ (⊤ : strict_chain α) 0
 
 lemma krull_dim_eq_len_of_order_top [order_top (strict_chain α)] :
   krull_dim α = (⊤ : strict_chain α).len :=
@@ -166,57 +156,42 @@ begin
   rw krull_dim,
   induction top_order_or_no_top_order (strict_chain α) with H H,
   { dsimp, congr' 1, apply strict_chain.top_len_unique', },
-  { exfalso, 
-    obtain ⟨p, hp⟩ := H.exists_not_le ⊤,
-    refine hp _,
-    apply le_top, },
+  { cases (H.exists_not_le ⊤).some_spec le_top, },
 end
 
 lemma krull_dim_eq_len_of_is_top [order_top (strict_chain α)] (p : strict_chain α) (hp : is_top p) :
   krull_dim α = p.len :=
 by rw [krull_dim_eq_len_of_order_top, (strict_chain.top_len_unique _ p hp).symm]
 
-instance no_top_order_of_strict_mono (f : α → β) (hf : strict_mono f) [no_top_order (strict_chain α)]
+lemma no_top_order_of_strict_mono (f : α → β) (hf : strict_mono f) [no_top_order (strict_chain α)]
   [nonempty α]: (no_top_order (strict_chain β)) :=
-begin
-  fconstructor,
-  intro smb,
-  cases (@strict_chain.exists_len_gt_of_infinite_dim α _ _ _ smb.len) with sma sms,
-  use strict_chain.map sma f hf,
-  rw [strict_chain.le_def, ←lt_iff_not_ge],
-  exact sms,
-end
+{ exists_not_le := λ smb, let ⟨p, hp⟩ := (strict_chain.exists_len_gt_of_infinite_dim α smb.len) in 
+    ⟨p.map f hf, not_le_of_lt hp⟩ }
 
 lemma krull_dim_le_of_strict_mono [decidable $ is_empty α] [decidable $ is_empty β]
   (f : α → β) (hf : strict_mono f) : krull_dim α ≤ krull_dim β :=
 sorry
 
-#check @function.is_empty
 end preorder
 
 instance t3 (R : Type*) [H : decidable $ nontrivial R] [comm_ring R] : 
   decidable (is_empty $ prime_spectrum R) :=
 match H with
-| is_true h := is_false begin 
-  rw not_is_empty_iff,
-  resetI,
-  exact ⟨⟨(ideal.exists_maximal R).some, (ideal.exists_maximal R).some_spec.is_prime⟩⟩,
-end
+| is_true h := is_false $ not_is_empty_iff.mpr $ 
+    by exactI ⟨⟨(ideal.exists_maximal R).some, (ideal.exists_maximal R).some_spec.is_prime⟩⟩
 | is_false h := is_true begin 
   rw not_nontrivial_iff_subsingleton at h,
   by_contra rid,
   rw not_is_empty_iff at rid,
-  cases rid,
-  refine rid.2.ne_top _,
+  refine rid.some.2.ne_top _,
   ext,
   simp only [submodule.mem_top, iff_true],
   convert ideal.zero_mem _,
-  resetI,
-  refine subsingleton.elim _ _,
+  exactI subsingleton.elim _ _,
 end
 end
 
-def ring_krull_dim (R : Type*) [decidable $ nontrivial R] [comm_ring R] : with_bot (with_top ℕ) :=
+def ring_krull_dim (R : Type*) [decidable $ nontrivial R] [comm_ring R] : ℕ±∞ :=
 krull_dim (prime_spectrum R)
 
 section partial_order
