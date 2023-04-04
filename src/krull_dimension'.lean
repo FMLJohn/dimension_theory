@@ -181,13 +181,9 @@ match H with
     by exactI ⟨⟨(ideal.exists_maximal R).some, (ideal.exists_maximal R).some_spec.is_prime⟩⟩
 | is_false h := is_true begin 
   rw not_nontrivial_iff_subsingleton at h,
-  by_contra rid,
-  rw not_is_empty_iff at rid,
-  refine rid.some.2.ne_top _,
-  ext,
-  simp only [submodule.mem_top, iff_true],
-  convert ideal.zero_mem _,
-  exactI subsingleton.elim _ _,
+  refine is_empty_iff.mpr (λ rid, rid.2.ne_top $ eq_top_iff.mpr $ λ x _, _),
+  rw [show x = 0, by exactI subsingleton.elim _ _],
+  exact ideal.zero_mem _,
 end
 end
 
