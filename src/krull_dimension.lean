@@ -286,7 +286,7 @@ end
 If `R` and `S` are isomorphic, then `krull_dim R = krull_dim S`.
 -/
 theorem krull_dim_eq_of_isom (S : Type*) [comm_ring S]
-  [e : R ≃+* S] : krull_dim R = krull_dim S :=
+  (e : R ≃+* S) : krull_dim R = krull_dim S :=
 begin
   by_cases hnt : nontrivial R,
   haveI : nontrivial R := hnt,

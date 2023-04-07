@@ -89,16 +89,13 @@ nonempty.intro ⟨0, λ _, nonempty.some infer_instance, λ _ _ h, (ne_of_lt h $
 
 lemma top_len_unique [order_top (strict_chain α)] (p : strict_chain α) (hp : is_top p) :
   p.len = (⊤ : strict_chain α).len :=
-begin 
-  have ineq1 : (⊤ : strict_chain α).len ≤ p.len := hp ⊤,
-  have ineq2 : p.len ≤ (⊤ : strict_chain α).len := @le_top (strict_chain α) _ _ _,
-  refine le_antisymm ineq2 ineq1,
-end
+le_antisymm (@le_top (strict_chain α) _ _ _) (hp ⊤)
 
 lemma top_len_unique' (H1 H2 : order_top (strict_chain α)) : H1.top.len = H2.top.len :=
 le_antisymm (H2.le_top H1.top) (H1.le_top H2.top)
 
 variables {α β}
+
 @[simps]
 def map (p : strict_chain α) (f : α → β) (hf : strict_mono f) : strict_chain β :=
 { len := p.len,
