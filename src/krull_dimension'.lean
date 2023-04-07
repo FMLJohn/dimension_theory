@@ -10,10 +10,12 @@ import ring_theory.ideal.basic
 --- 
 General theory
 
-- `f : α → β` is strictly monotonic, then `krull_dim α ≤ krull_dim β` (*) [`strict_chain.map`pushforward];
-  - almost finished
-- `f : α → β` is strictly comonotonic and surjective, then `krull_dim β ≤ krull_dim α` [`strict_chain.comap`pullback];
-- `height` makes sense for any preodered set
+- [x] `f : α → β` is strictly monotonic, then `krull_dim α ≤ krull_dim β` by pushing out (using 
+  `strict_chain.map`).
+- [x] `f : α → β` is strictly comonotonic and surjective, then `krull_dim β ≤ krull_dim α` by 
+  pulling back (using `strict_chain.comap`).
+- [x] `height` makes sense for any preodered set.
+- [x] `krull_dim` is equal to supremum of height.
 - `krull_nat_dim` : works for "finite_dim" `[order_top (chain α)]`, `α → ℕ`.
 - `krull_nat_dim = krull_dim` when finite dimensional
 
@@ -42,11 +44,19 @@ section strict_comono
 
 variables {α β}
 
+/--
+A function `f : α → β` is said to be strictly comonotonic (dual to strictly monotonic) 
+if and only if `a < b` is implied by `f a < f b` for all `a, b : β`.
+-/
 def strict_comono (f : α → β) : Prop :=
 ∀ ⦃a b⦄, f a < f b → a < b
 
 end strict_comono
 
+/--
+For a preordered set `(α, <)`, a strict chain of `α` of length `n` is a strictly monotonic function
+`fin (n + 1) → α`, i.e. `a₀ < a₁ < ... < aₙ` with `a_i : α`.
+-/
 structure strict_chain :=
 (len : ℕ)
 (func : fin (len + 1) → α)
@@ -57,6 +67,9 @@ namespace strict_chain
 instance : has_coe_to_fun (strict_chain α) (λ x, fin (x.len + 1) → α) :=
 { coe := λ x, x.func }
 
+/--
+The induced ordering on `strict_chain α` is by comparing length of strict chains.
+-/
 instance : has_le (strict_chain α) :=
 { le := λ p q, p.len ≤ q.len }
 
@@ -96,12 +109,23 @@ le_antisymm (H2.le_top H1.top) (H1.le_top H2.top)
 
 variables {α β}
 
+/--
+For two pre-ordered sets `α, β`, if `f : α → β` is strictly monotonic, then a strict chain of `α` 
+can be pushed out to a strict chain of `β` by 
+`a₀ < a₁ < ... < aₙ ↦ f a₀ < f a₁ < ... < f aₙ`
+-/
 @[simps]
 def map (p : strict_chain α) (f : α → β) (hf : strict_mono f) : strict_chain β :=
 { len := p.len,
   func := f.comp p,
   strict_mono' := hf.comp p.strict_mono' }
 
+/--
+For two pre-ordered sets `α, β`, if `f : α → β` is surjective and strictly monotonic, then a strict 
+chain of `β` can be pulled back to a strict chain of `α` by 
+`b₀ < b₁ < ... < bₙ ↦ f⁻¹ b₀ < f⁻¹ b₁ < ... < f⁻¹ bₙ` where `f⁻¹ bᵢ` is an arbitrary element in the
+preimage of `f⁻¹ {bᵢ}`.
+-/
 @[simps]
 def comap (p : strict_chain β) (f : α → β) (hf1 : strict_comono f) (hf2 : function.surjective f) :
   strict_chain α :=
@@ -126,12 +150,17 @@ end
 
 end strict_chain
 
+/--
+Krull dimension of a pre-ordered set `α` is the supremum of lengths of all strict chains of `α`.
+-/
 @[reducible] def krull_dim : ℕ±∞ := ⨆ (p : strict_chain α), p.len
 
 variables {α}
 
-@[reducible] def height (a : α) : ℕ±∞ :=
-krull_dim (set.Iic a)
+/--
+Height of an element `a` of a pre-ordered set `α` is the Krull dimension of the subset `(-∞, a]`
+-/
+@[reducible] def height (a : α) : ℕ±∞ := krull_dim (set.Iic a)
 
 variable α
 
@@ -184,13 +213,24 @@ lemma krull_dim_le_of_strict_comono_and_surj
   (f : α → β) (hf : strict_comono f) (hf' : function.surjective f) : krull_dim β ≤ krull_dim α :=
 supr_le $ λ p, le_Sup ⟨p.comap _ hf hf', rfl⟩
 
+lemma krull_dim_eq_of_order_iso (f : α ≃o β) : krull_dim α = krull_dim β :=
+le_antisymm (krull_dim_le_of_strict_mono f f.strict_mono) (krull_dim_le_of_strict_comono_and_surj f 
+  (λ _ _ h, by convert f.symm.strict_mono h; rw f.symm_apply_apply) f.surjective)
+
+variable (α)
+
+lemma krull_dim_eq_supr_height : krull_dim α = ⨆ (a : α), height a :=
+le_antisymm (supr_le $ λ i, le_supr_of_le (i ⟨i.len, lt_add_one _⟩) $ le_Sup 
+  ⟨⟨_, λ m, ⟨i m, i.strict_mono'.monotone begin 
+    rw [show m = ⟨m.1, m.2⟩, by cases m; refl, fin.mk_le_mk],
+    linarith [m.2],
+  end⟩, i.strict_mono'⟩, rfl⟩) $ 
+supr_le $ λ a, krull_dim_le_of_strict_mono subtype.val $ λ _ _ h, h
+
 end preorder
 
+/--
+The ring theoretic Krull dimension is the Krull dimension of prime spectrum ordered by inclusion.
+-/
 def ring_krull_dim (R : Type*) [comm_ring R] : ℕ±∞ :=
 krull_dim (prime_spectrum R)
-
-section partial_order
-
-variables [partial_order α]
-
-end partial_order
