@@ -187,6 +187,11 @@ lemma krull_dim_eq_len_of_order_top [order_top (strict_chain α)] :
 le_antisymm (supr_le $ λ i, with_bot.coe_le_coe.mpr $ with_top.coe_le_coe.mpr $ 
     order_top.le_top i) (le_Sup ⟨_, rfl⟩)
 
+lemma krull_dim_eq_len_of_order_top' [order_top (strict_chain α)] 
+  (q : strict_chain α) (h : is_top q) :
+  krull_dim α = q.len :=
+(krull_dim_eq_len_of_order_top α).trans $ strict_chain.top_len_unique α _ h ▸ rfl
+
 variables {α β}
 
 lemma krull_dim_eq_len_of_is_top [order_top (strict_chain α)] (p : strict_chain α) (hp : is_top p) :
@@ -226,3 +231,39 @@ The ring theoretic Krull dimension is the Krull dimension of prime spectrum orde
 -/
 def ring_krull_dim (R : Type*) [comm_ring R] : ℕ±∞ :=
 krull_dim (prime_spectrum R)
+
+
+namespace ring_krull_dim
+
+instance (F : Type*) [field F] : unique (prime_spectrum F) :=
+{ default := ⟨⊥, ideal.bot_prime⟩,
+  uniq := λ p, prime_spectrum.ext _ _ $ ideal.ext $ λ x, begin
+    rw [submodule.mem_bot],
+    refine ⟨λ h, _, λ h, h.symm ▸ submodule.zero_mem _⟩,
+    rwa [p.as_ideal.eq_bot_of_prime, submodule.mem_bot] at h,
+  end }
+
+instance (F : Type*) [field F] : order_top (strict_chain (prime_spectrum F)) :=
+{ top := 
+  { len := 0,
+    func := λ _, default,
+    strict_mono' := λ _ _ h, (ne_of_gt h $ subsingleton.elim _ _).elim },
+  le_top := begin 
+    rintros ⟨l, f, h⟩,
+    change l ≤ 0,
+    by_contra rid,
+    push_neg at rid,
+    refine ne_of_gt (@h 0 1 _) (subsingleton.elim _ _),
+    rw [show (0 : fin (l + 1)) = ⟨0, _⟩, from rfl, 
+      show (1 : fin (l + 1)) = ⟨1, lt_add_of_pos_left _ rid⟩, from begin 
+        rw [fin.eq_iff_veq, fin.one_val],
+        dsimp only, 
+        rw [← nat.succ_pred_eq_of_pos rid, nat.one_mod],
+      end], 
+    exact nat.zero_lt_one,
+  end }
+
+lemma eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 :=
+krull_dim_eq_len_of_order_top (prime_spectrum F)
+
+end ring_krull_dim
