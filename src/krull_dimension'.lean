@@ -85,11 +85,7 @@ instance : preorder (strict_chain α) :=
   lt := (<),
   le_refl := λ a, show a.len ≤ a.len, from le_refl _,
   le_trans := λ a b c (h : a.len ≤ b.len) (h' : b.len ≤ c.len), show a.len ≤ c.len, from h.trans h',
-  lt_iff_le_not_le := λ a b,
-  begin 
-    rw [le_def, lt_def, le_def],
-    exact lt_iff_le_not_le,
-  end }
+  lt_iff_le_not_le := λ a b, @lt_iff_le_not_le ℕ _ a.len b.len }
 
 instance [is_empty α] : is_empty $ strict_chain α :=
 { false := λ p, @is_empty.elim α (infer_instance : is_empty α) (λ _, false) (p 0) }
@@ -162,31 +158,27 @@ Height of an element `a` of a pre-ordered set `α` is the Krull dimension of the
 -/
 @[reducible] def height (a : α) : ℕ±∞ := krull_dim (set.Iic a)
 
-variable α
+variable (α)
 
-lemma krull_dim_eq_bot_of_is_empty [is_empty α] :
-  krull_dim α = ⊥ :=
+lemma krull_dim_eq_bot_of_is_empty [is_empty α] : krull_dim α = ⊥ :=
 with_bot.csupr_empty _
 
-lemma krull_dim_eq_top_of_no_top_order [nonempty α] [no_top_order (strict_chain α)] :
+lemma krull_dim_eq_top_of_no_top_order [nonempty α] [no_top_order (strict_chain α)] : 
   krull_dim α = ⊤ :=
-le_antisymm le_top $ le_Sup_iff.mpr $ λ m hm, 
-match m, hm with
+le_antisymm le_top $ le_Sup_iff.mpr $ λ m hm, match m, hm with
 | ⊥, hm := false.elim begin 
   haveI : inhabited α := classical.inhabited_of_nonempty infer_instance,
   exact not_le_of_lt (with_bot.bot_lt_coe _ : ⊥ < (0 : ℕ±∞)) 
     (hm ⟨⟨0, λ _, default, λ _ _ h, ((ne_of_lt h) $ subsingleton.elim _ _).elim⟩, rfl⟩),
 end
-| some m, hm := match m, hm with
-| ⊤, hm := le_refl _
-| some m, hm := begin 
+| some ⊤, hm := le_refl _ 
+| some (some m), hm := begin 
   rw mem_upper_bounds at hm,
   obtain ⟨p, hp⟩ := strict_chain.exists_len_gt_of_infinite_dim α m,
   specialize hm p.len ⟨p, rfl⟩,
   refine (not_lt_of_le hm _).elim,
   erw [with_bot.some_eq_coe, with_bot.coe_lt_coe, with_top.some_eq_coe, with_top.coe_lt_coe],
   assumption,
-end
 end
 end
 
