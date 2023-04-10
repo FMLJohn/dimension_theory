@@ -247,6 +247,15 @@ begin
 end
 
 /--
+If `I` is an ideal of `R`, then `ring_krull_dim (R ⧸ I) ≤ ring_krull_dim R`.
+-/
+theorem le_of_quot (I R : Type*) [comm_ring R] (I : ideal R) :
+  ring_krull_dim (R ⧸ I) ≤ ring_krull_dim R :=
+begin
+  exact le_of_surj _ _ (ideal.quotient.mk I) ideal.quotient.mk_surjective,
+end
+
+/--
 If `R` and `S` are isomorphic, then `krull_dim R = krull_dim S`.
 -/
 theorem eq_of_isom (R S : Type*) [comm_ring R] [comm_ring S] (e : R ≃+* S) :
