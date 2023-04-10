@@ -9,6 +9,10 @@ import ring_theory.ideal.basic
 `α, β` preodered sets
 --- 
 General theory
+<<<<<<< HEAD
+=======
+
+>>>>>>> eef593ac704ba0d7ed3f8c21711e64f9e3088d3f
 - [x] `f : α → β` is strictly monotonic, then `krull_dim α ≤ krull_dim β` by pushing out (using 
   `strict_chain.map`).
 - [x] `f : α → β` is strictly comonotonic and surjective, then `krull_dim β ≤ krull_dim α` by 
@@ -154,12 +158,21 @@ variables {α}
 Height of an element `a` of a pre-ordered set `α` is the Krull dimension of the subset `(-∞, a]`
 -/
 @[reducible] def height (a : α) : ℕ±∞ := krull_dim (set.Iic a)
+<<<<<<< HEAD
 
 variable (α)
 
 lemma krull_dim_eq_bot_of_is_empty [is_empty α] : krull_dim α = ⊥ :=
 with_bot.csupr_empty _
 
+=======
+
+variable (α)
+
+lemma krull_dim_eq_bot_of_is_empty [is_empty α] : krull_dim α = ⊥ :=
+with_bot.csupr_empty _
+
+>>>>>>> eef593ac704ba0d7ed3f8c21711e64f9e3088d3f
 lemma krull_dim_eq_top_of_no_top_order [nonempty α] [no_top_order (strict_chain α)] : 
   krull_dim α = ⊤ :=
 le_antisymm le_top $ le_Sup_iff.mpr $ λ m hm, match m, hm with
@@ -202,6 +215,7 @@ lemma no_top_order_of_strict_mono (f : α → β) (hf : strict_mono f) [no_top_o
 
 lemma krull_dim_le_of_strict_mono (f : α → β) (hf : strict_mono f) : krull_dim α ≤ krull_dim β :=
 supr_le $ λ p, le_Sup ⟨p.map _ hf, rfl⟩
+<<<<<<< HEAD
 
 lemma krull_dim_le_of_strict_comono_and_surj 
   (f : α → β) (hf : strict_comono f) (hf' : function.surjective f) : krull_dim β ≤ krull_dim α :=
@@ -289,3 +303,67 @@ lemma eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 :=
 krull_dim_eq_len_of_order_top (prime_spectrum F)
 
 end ring_krull_dim
+=======
+
+lemma krull_dim_le_of_strict_comono_and_surj 
+  (f : α → β) (hf : strict_comono f) (hf' : function.surjective f) : krull_dim β ≤ krull_dim α :=
+supr_le $ λ p, le_Sup ⟨p.comap _ hf hf', rfl⟩
+
+lemma krull_dim_eq_of_order_iso (f : α ≃o β) : krull_dim α = krull_dim β :=
+le_antisymm (krull_dim_le_of_strict_mono f f.strict_mono) (krull_dim_le_of_strict_comono_and_surj f 
+  (λ _ _ h, by convert f.symm.strict_mono h; rw f.symm_apply_apply) f.surjective)
+
+variable (α)
+
+lemma krull_dim_eq_supr_height : krull_dim α = ⨆ (a : α), height a :=
+le_antisymm (supr_le $ λ i, le_supr_of_le (i ⟨i.len, lt_add_one _⟩) $ le_Sup 
+  ⟨⟨_, λ m, ⟨i m, i.strict_mono'.monotone begin 
+    rw [show m = ⟨m.1, m.2⟩, by cases m; refl, fin.mk_le_mk],
+    linarith [m.2],
+  end⟩, i.strict_mono'⟩, rfl⟩) $ 
+supr_le $ λ a, krull_dim_le_of_strict_mono subtype.val $ λ _ _ h, h
+
+end preorder
+
+/--
+The ring theoretic Krull dimension is the Krull dimension of prime spectrum ordered by inclusion.
+-/
+def ring_krull_dim (R : Type*) [comm_ring R] : ℕ±∞ :=
+krull_dim (prime_spectrum R)
+
+
+namespace ring_krull_dim
+
+instance (F : Type*) [field F] : unique (prime_spectrum F) :=
+{ default := ⟨⊥, ideal.bot_prime⟩,
+  uniq := λ p, prime_spectrum.ext _ _ $ ideal.ext $ λ x, begin
+    rw [submodule.mem_bot],
+    refine ⟨λ h, _, λ h, h.symm ▸ submodule.zero_mem _⟩,
+    rwa [p.as_ideal.eq_bot_of_prime, submodule.mem_bot] at h,
+  end }
+
+instance (F : Type*) [field F] : order_top (strict_chain (prime_spectrum F)) :=
+{ top := 
+  { len := 0,
+    func := λ _, default,
+    strict_mono' := λ _ _ h, (ne_of_gt h $ subsingleton.elim _ _).elim },
+  le_top := begin 
+    rintros ⟨l, f, h⟩,
+    change l ≤ 0,
+    by_contra rid,
+    push_neg at rid,
+    refine ne_of_gt (@h 0 1 _) (subsingleton.elim _ _),
+    rw [show (0 : fin (l + 1)) = ⟨0, _⟩, from rfl, 
+      show (1 : fin (l + 1)) = ⟨1, lt_add_of_pos_left _ rid⟩, from begin 
+        rw [fin.eq_iff_veq, fin.one_val],
+        dsimp only, 
+        rw [← nat.succ_pred_eq_of_pos rid, nat.one_mod],
+      end], 
+    exact nat.zero_lt_one,
+  end }
+
+lemma eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 :=
+krull_dim_eq_len_of_order_top (prime_spectrum F)
+
+end ring_krull_dim
+>>>>>>> eef593ac704ba0d7ed3f8c21711e64f9e3088d3f
