@@ -9,26 +9,27 @@ import ring_theory.ideal.basic
 `α, β` preodered sets
 --- 
 General theory
-
-- `f : α → β` is strictly monotonic, then `krull_dim α ≤ krull_dim β` (*) [`strict_chain.map`pushforward];
-  - almost finished
-- `f : α → β` is strictly comonotonic and surjective, then `krull_dim β ≤ krull_dim α` [`strict_chain.comap`pullback];
-- `height` makes sense for any preodered set
+- [x] `f : α → β` is strictly monotonic, then `krull_dim α ≤ krull_dim β` by pushing out (using 
+  `strict_chain.map`).
+- [x] `f : α → β` is strictly comonotonic and surjective, then `krull_dim β ≤ krull_dim α` by 
+  pulling back (using `strict_chain.comap`).
+- [x] `height` makes sense for any preodered set.
+- [x] `krull_dim` is equal to supremum of height.
 - `krull_nat_dim` : works for "finite_dim" `[order_top (chain α)]`, `α → ℕ`.
 - `krull_nat_dim = krull_dim` when finite dimensional
-
 -------
 Theory needs to take place in `Top, Ring, Module` Concerte
 - (*) imply `R ⟶ S` surjective homomorphism, then `dim S ≤ dim R`;
 - need to show `height 𝔭 = krull_dim (localizaiton.at_prime 𝔭)`
 - `coheight` probably doesn't make sense in general preorder
 - `height 𝔭 + coheight 𝔭 ≤ krull_dim R`
-
 Important but far away
 - If `R` is noetherian and local, then `R` is finite dimensional.
 -/
 
 noncomputable theory
+
+local notation `ℕ±∞` := with_bot (with_top ℕ)
 
 variables (α β : Type*)
 
@@ -40,11 +41,19 @@ section strict_comono
 
 variables {α β}
 
+/--
+A function `f : α → β` is said to be strictly comonotonic (dual to strictly monotonic) 
+if and only if `a < b` is implied by `f a < f b` for all `a, b : β`.
+-/
 def strict_comono (f : α → β) : Prop :=
 ∀ ⦃a b⦄, f a < f b → a < b
 
 end strict_comono
 
+/--
+For a preordered set `(α, <)`, a strict chain of `α` of length `n` is a strictly monotonic function
+`fin (n + 1) → α`, i.e. `a₀ < a₁ < ... < aₙ` with `a_i : α`.
+-/
 structure strict_chain :=
 (len : ℕ)
 (func : fin (len + 1) → α)
@@ -55,6 +64,9 @@ namespace strict_chain
 instance : has_coe_to_fun (strict_chain α) (λ x, fin (x.len + 1) → α) :=
 { coe := λ x, x.func }
 
+/--
+The induced ordering on `strict_chain α` is by comparing length of strict chains.
+-/
 instance : has_le (strict_chain α) :=
 { le := λ p q, p.len ≤ q.len }
 
@@ -70,157 +82,210 @@ instance : preorder (strict_chain α) :=
   lt := (<),
   le_refl := λ a, show a.len ≤ a.len, from le_refl _,
   le_trans := λ a b c (h : a.len ≤ b.len) (h' : b.len ≤ c.len), show a.len ≤ c.len, from h.trans h',
-  lt_iff_le_not_le := λ a b,
-  begin 
-    rw [le_def, lt_def, le_def],
-    exact lt_iff_le_not_le,
-  end }
+  lt_iff_le_not_le := λ a b, @lt_iff_le_not_le ℕ _ a.len b.len }
 
 instance [is_empty α] : is_empty $ strict_chain α :=
 { false := λ p, @is_empty.elim α (infer_instance : is_empty α) (λ _, false) (p 0) }
 
+instance [inhabited α] : inhabited $ strict_chain α :=
+{ default := ⟨0, λ _, default, λ _ _ h, (ne_of_lt h $ subsingleton.elim _ _).elim⟩ }
+
+instance [nonempty α] : nonempty $ strict_chain α :=
+nonempty.intro ⟨0, λ _, nonempty.some infer_instance, λ _ _ h, (ne_of_lt h $ subsingleton.elim _ _).elim⟩
+
 lemma top_len_unique [order_top (strict_chain α)] (p : strict_chain α) (hp : is_top p) :
   p.len = (⊤ : strict_chain α).len :=
-begin 
-  have ineq1 : (⊤ : strict_chain α).len ≤ p.len := hp ⊤,
-  have ineq2 : p.len ≤ (⊤ : strict_chain α).len := @le_top (strict_chain α) _ _ _,
-  refine le_antisymm ineq2 ineq1,
-end
+le_antisymm (@le_top (strict_chain α) _ _ _) (hp ⊤)
 
 lemma top_len_unique' (H1 H2 : order_top (strict_chain α)) : H1.top.len = H2.top.len :=
 le_antisymm (H2.le_top H1.top) (H1.le_top H2.top)
 
 variables {α β}
+
+/--
+For two pre-ordered sets `α, β`, if `f : α → β` is strictly monotonic, then a strict chain of `α` 
+can be pushed out to a strict chain of `β` by 
+`a₀ < a₁ < ... < aₙ ↦ f a₀ < f a₁ < ... < f aₙ`
+-/
 @[simps]
 def map (p : strict_chain α) (f : α → β) (hf : strict_mono f) : strict_chain β :=
 { len := p.len,
   func := f.comp p,
   strict_mono' := hf.comp p.strict_mono' }
 
+/--
+For two pre-ordered sets `α, β`, if `f : α → β` is surjective and strictly monotonic, then a strict 
+chain of `β` can be pulled back to a strict chain of `α` by 
+`b₀ < b₁ < ... < bₙ ↦ f⁻¹ b₀ < f⁻¹ b₁ < ... < f⁻¹ bₙ` where `f⁻¹ bᵢ` is an arbitrary element in the
+preimage of `f⁻¹ {bᵢ}`.
+-/
 @[simps]
 def comap (p : strict_chain β) (f : α → β) (hf1 : strict_comono f) (hf2 : function.surjective f) :
   strict_chain α :=
 { len := p.len,
-  func := λ i, (hf2 (p.func i)).some,
-  strict_mono' := λ i j h, begin
-      have h' : f (hf2 (p.func i)).some < f (hf2 (p.func j)).some,
-        rw [(hf2 (p.func i)).some_spec, (hf2 (p.func j)).some_spec],
-        exact p.strict_mono' h,
-      exact hf1 h',
-    end}
+  func := λ i, (hf2 (p i)).some,
+  strict_mono' := λ i j h, hf1 (by simpa only [(hf2 _).some_spec] using p.strict_mono' h) }
 
-lemma exists_len_gt_of_infinite_dim [no_top_order (strict_chain α)] [H : nonempty α] (n : ℕ) : 
+variable (α)
+
+lemma exists_len_gt_of_infinite_dim [no_top_order (strict_chain α)] [nonempty α] (n : ℕ) : 
   ∃ (p : strict_chain α), n < p.len :=
 begin
-  let a : α := H.some,
-  set default_chain : strict_chain α := ⟨0, λ p, a, begin 
-    intros a b h,
-    exfalso,
-    exact ne_of_lt h (subsingleton.elim _ _),
-  end⟩ with d_eq, 
+  haveI : inhabited α := classical.inhabited_of_nonempty infer_instance,
   induction n with n ih,
-  { rcases no_top_order.exists_not_le default_chain with ⟨p, hp⟩,
-    simp only [le_def, not_le, d_eq] at hp,
-    exact ⟨p, hp⟩, },
+  { obtain ⟨p, hp⟩ := no_top_order.exists_not_le (default : strict_chain α),
+    refine ⟨p, lt_of_not_le hp⟩, },
   { rcases ih with ⟨p, hp⟩,
     rcases no_top_order.exists_not_le p with ⟨q, hq⟩,
-    use q,
-    rw [le_def, not_le] at hq,
-    rw nat.succ_eq_add_one,
-    linarith, },
+    dsimp [le_def, not_le, nat.succ_eq_add_one] at *,
+    exact ⟨q, by linarith⟩, },
 end
 
 end strict_chain
 
-def krull_dim [decidable (is_empty α)] : with_bot (with_top ℕ) :=
-psum.cases_on (top_order_or_no_top_order (strict_chain α)) 
-(λ H, H.top.len) 
-(λ H, if is_empty α then ⊥ else ⊤)
+/--
+Krull dimension of a pre-ordered set `α` is the supremum of lengths of all strict chains of `α`.
+-/
+@[reducible] def krull_dim : ℕ±∞ := ⨆ (p : strict_chain α), p.len
 
 variables {α}
 
-def height (a : α) [decidable (is_empty (set.Iic a))] : with_bot (with_top ℕ) :=
-krull_dim (set.Iic a)
+/--
+Height of an element `a` of a pre-ordered set `α` is the Krull dimension of the subset `(-∞, a]`
+-/
+@[reducible] def height (a : α) : ℕ±∞ := krull_dim (set.Iic a)
 
-instance t1 [H : is_empty α] : decidable (is_empty α) :=
-is_true H
+variable (α)
 
-lemma krull_dim_eq_bot_of_is_empty [is_empty α] :
-  krull_dim α = ⊥ :=
-begin 
-  rw [krull_dim, show top_order_or_no_top_order (strict_chain α) = psum.inr _, from _],
-  { dsimp only, rw if_pos, apply_instance },
-  { fconstructor, intros a, refine @is_empty.elim (strict_chain α) infer_instance _ a, },
-  { dunfold top_order_or_no_top_order, rw dif_pos, },
+lemma krull_dim_eq_bot_of_is_empty [is_empty α] : krull_dim α = ⊥ :=
+with_bot.csupr_empty _
+
+lemma krull_dim_eq_top_of_no_top_order [nonempty α] [no_top_order (strict_chain α)] : 
+  krull_dim α = ⊤ :=
+le_antisymm le_top $ le_Sup_iff.mpr $ λ m hm, match m, hm with
+| ⊥, hm := false.elim begin 
+  haveI : inhabited α := classical.inhabited_of_nonempty infer_instance,
+  exact not_le_of_lt (with_bot.bot_lt_coe _ : ⊥ < (0 : ℕ±∞)) 
+    (hm ⟨⟨0, λ _, default, λ _ _ h, ((ne_of_lt h) $ subsingleton.elim _ _).elim⟩, rfl⟩),
 end
-
-instance t2 [order_top (strict_chain α)] : decidable (is_empty α) :=
-is_false begin 
-  rw not_is_empty_iff,
-  refine nonempty.intro ((⊤ : strict_chain α) 0),
+| some ⊤, hm := le_refl _ 
+| some (some m), hm := begin 
+  rw mem_upper_bounds at hm,
+  obtain ⟨p, hp⟩ := strict_chain.exists_len_gt_of_infinite_dim α m,
+  specialize hm p.len ⟨p, rfl⟩,
+  refine (not_lt_of_le hm _).elim,
+  erw [with_bot.some_eq_coe, with_bot.coe_lt_coe, with_top.some_eq_coe, with_top.coe_lt_coe],
+  assumption,
+end
 end
 
 lemma krull_dim_eq_len_of_order_top [order_top (strict_chain α)] :
   krull_dim α = (⊤ : strict_chain α).len :=
-begin
-  rw krull_dim,
-  induction top_order_or_no_top_order (strict_chain α) with H H,
-  { dsimp, congr' 1, apply strict_chain.top_len_unique', },
-  { exfalso, 
-    obtain ⟨p, hp⟩ := H.exists_not_le ⊤,
-    refine hp _,
-    apply le_top, },
-end
+le_antisymm (supr_le $ λ i, with_bot.coe_le_coe.mpr $ with_top.coe_le_coe.mpr $ 
+    order_top.le_top i) (le_Sup ⟨_, rfl⟩)
+
+lemma krull_dim_eq_len_of_order_top' [order_top (strict_chain α)] 
+  (q : strict_chain α) (h : is_top q) :
+  krull_dim α = q.len :=
+(krull_dim_eq_len_of_order_top α).trans $ strict_chain.top_len_unique α _ h ▸ rfl
+
+variables {α β}
 
 lemma krull_dim_eq_len_of_is_top [order_top (strict_chain α)] (p : strict_chain α) (hp : is_top p) :
   krull_dim α = p.len :=
 by rw [krull_dim_eq_len_of_order_top, (strict_chain.top_len_unique _ p hp).symm]
 
-instance no_top_order_of_strict_mono (f : α → β) (hf : strict_mono f) [no_top_order (strict_chain α)]
+lemma no_top_order_of_strict_mono (f : α → β) (hf : strict_mono f) [no_top_order (strict_chain α)]
   [nonempty α]: (no_top_order (strict_chain β)) :=
-begin
-  fconstructor,
-  intro smb,
-  cases (@strict_chain.exists_len_gt_of_infinite_dim α _ _ _ smb.len) with sma sms,
-  use strict_chain.map sma f hf,
-  rw [strict_chain.le_def, ←lt_iff_not_ge],
-  exact sms,
-end
+{ exists_not_le := λ smb, let ⟨p, hp⟩ := (strict_chain.exists_len_gt_of_infinite_dim α smb.len) in 
+    ⟨p.map f hf, not_le_of_lt hp⟩ }
 
-lemma krull_dim_le_of_strict_mono [decidable $ is_empty α] [decidable $ is_empty β]
-  (f : α → β) (hf : strict_mono f) : krull_dim α ≤ krull_dim β :=
-sorry
+lemma krull_dim_le_of_strict_mono (f : α → β) (hf : strict_mono f) : krull_dim α ≤ krull_dim β :=
+supr_le $ λ p, le_Sup ⟨p.map _ hf, rfl⟩
 
-#check @function.is_empty
+lemma krull_dim_le_of_strict_comono_and_surj 
+  (f : α → β) (hf : strict_comono f) (hf' : function.surjective f) : krull_dim β ≤ krull_dim α :=
+supr_le $ λ p, le_Sup ⟨p.comap _ hf hf', rfl⟩
+
+lemma krull_dim_eq_of_order_iso (f : α ≃o β) : krull_dim α = krull_dim β :=
+le_antisymm (krull_dim_le_of_strict_mono f f.strict_mono) (krull_dim_le_of_strict_comono_and_surj f 
+  (λ _ _ h, by convert f.symm.strict_mono h; rw f.symm_apply_apply) f.surjective)
+
+variable (α)
+
+lemma krull_dim_eq_supr_height : krull_dim α = ⨆ (a : α), height a :=
+le_antisymm (supr_le $ λ i, le_supr_of_le (i ⟨i.len, lt_add_one _⟩) $ le_Sup 
+  ⟨⟨_, λ m, ⟨i m, i.strict_mono'.monotone begin 
+    rw [show m = ⟨m.1, m.2⟩, by cases m; refl, fin.mk_le_mk],
+    linarith [m.2],
+  end⟩, i.strict_mono'⟩, rfl⟩) $ 
+supr_le $ λ a, krull_dim_le_of_strict_mono subtype.val $ λ _ _ h, h
+
 end preorder
 
-instance t3 (R : Type*) [H : decidable $ nontrivial R] [comm_ring R] : 
-  decidable (is_empty $ prime_spectrum R) :=
-match H with
-| is_true h := is_false begin 
-  rw not_is_empty_iff,
-  resetI,
-  exact ⟨⟨(ideal.exists_maximal R).some, (ideal.exists_maximal R).some_spec.is_prime⟩⟩,
-end
-| is_false h := is_true begin 
-  rw not_nontrivial_iff_subsingleton at h,
-  by_contra rid,
-  rw not_is_empty_iff at rid,
-  cases rid,
-  refine rid.2.ne_top _,
-  ext,
-  simp only [submodule.mem_top, iff_true],
-  convert ideal.zero_mem _,
-  resetI,
-  refine subsingleton.elim _ _,
-end
-end
-
-def ring_krull_dim (R : Type*) [decidable $ nontrivial R] [comm_ring R] : with_bot (with_top ℕ) :=
+/--
+The ring theoretic Krull dimension is the Krull dimension of prime spectrum ordered by inclusion.
+-/
+def ring_krull_dim (R : Type*) [comm_ring R] : ℕ±∞ :=
 krull_dim (prime_spectrum R)
 
-section partial_order
 
-variables [partial_order α]
+namespace ring_krull_dim
 
-end partial_order
+/--
+If `R ⟶ S` is a surjective ring homomorphism, then `ring_krull_dim S ≤ ring_krull_dim R`.
+-/
+theorem le_of_surj (R S : Type*) [comm_ring R] [comm_ring S] (f : R →+* S)
+  (hf : function.surjective f) : ring_krull_dim S ≤ ring_krull_dim R :=
+begin
+  have hcmf : monotone (prime_spectrum.comap f),
+    intros I J hIJ,
+    exact ideal.comap_mono hIJ,
+  exact krull_dim_le_of_strict_mono (prime_spectrum.comap f)
+    (monotone.strict_mono_of_injective hcmf
+      (prime_spectrum.comap_injective_of_surjective f hf)),
+end
+
+/--
+If `R` and `S` are isomorphic, then `krull_dim R = krull_dim S`.
+-/
+theorem eq_of_isom (R S : Type*) [comm_ring R] [comm_ring S] (e : R ≃+* S) :
+  ring_krull_dim R = ring_krull_dim S :=
+begin
+  exact le_antisymm (le_of_surj S R (ring_equiv.symm e)
+    (equiv_like.surjective (ring_equiv.symm e)))
+      (le_of_surj R S e (equiv_like.surjective e)),
+end
+
+instance (F : Type*) [field F] : unique (prime_spectrum F) :=
+{ default := ⟨⊥, ideal.bot_prime⟩,
+  uniq := λ p, prime_spectrum.ext _ _ $ ideal.ext $ λ x, begin
+    rw [submodule.mem_bot],
+    refine ⟨λ h, _, λ h, h.symm ▸ submodule.zero_mem _⟩,
+    rwa [p.as_ideal.eq_bot_of_prime, submodule.mem_bot] at h,
+  end }
+
+instance (F : Type*) [field F] : order_top (strict_chain (prime_spectrum F)) :=
+{ top := 
+  { len := 0,
+    func := λ _, default,
+    strict_mono' := λ _ _ h, (ne_of_gt h $ subsingleton.elim _ _).elim },
+  le_top := begin 
+    rintros ⟨l, f, h⟩,
+    change l ≤ 0,
+    by_contra rid,
+    push_neg at rid,
+    refine ne_of_gt (@h 0 1 _) (subsingleton.elim _ _),
+    rw [show (0 : fin (l + 1)) = ⟨0, _⟩, from rfl, 
+      show (1 : fin (l + 1)) = ⟨1, lt_add_of_pos_left _ rid⟩, from begin 
+        rw [fin.eq_iff_veq, fin.one_val],
+        dsimp only, 
+        rw [← nat.succ_pred_eq_of_pos rid, nat.one_mod],
+      end], 
+    exact nat.zero_lt_one,
+  end }
+
+lemma eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 :=
+krull_dim_eq_len_of_order_top (prime_spectrum F)
+
+end ring_krull_dim
