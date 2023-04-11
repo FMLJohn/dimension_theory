@@ -229,6 +229,14 @@ supr_le $ λ a, krull_dim_le_of_strict_mono subtype.val $ λ _ _ h, h
 end preorder
 
 /--
+Krull dimension of a topological space is the supremum of length of chains of closed irreducible 
+sets.
+-/
+def topological_krull_dim (T : Type*) [topological_space T] : ℕ±∞ :=
+krull_dim { s : set T | is_closed s ∧ is_irreducible s }ᵒᵈ
+
+
+/--
 The ring theoretic Krull dimension is the Krull dimension of prime spectrum ordered by inclusion.
 -/
 def ring_krull_dim (R : Type*) [comm_ring R] : ℕ±∞ :=
@@ -236,6 +244,33 @@ krull_dim (prime_spectrum R)
 
 
 namespace ring_krull_dim
+
+lemma eq_topological_krull_dim (R : Type*) [comm_ring R] :
+  ring_krull_dim R = topological_krull_dim (prime_spectrum R) :=
+krull_dim_eq_of_order_iso 
+{ to_fun := λ p, order_dual.to_dual (⟨prime_spectrum.zero_locus p.as_ideal, 
+    prime_spectrum.is_closed_zero_locus p.as_ideal, 
+    (prime_spectrum.is_irreducible_zero_locus_iff _).mpr $ 
+      by simpa only [p.is_prime.radical] using p.is_prime⟩ : { s : set (prime_spectrum R) | is_closed s ∧ is_irreducible s }),
+  inv_fun := λ s, ⟨prime_spectrum.vanishing_ideal (order_dual.of_dual s).1, 
+    prime_spectrum.is_irreducible_iff_vanishing_ideal_is_prime.mp (order_dual.of_dual s).2.2⟩,
+  left_inv := λ p, begin 
+    ext1,
+    dsimp,
+    rw [prime_spectrum.vanishing_ideal_zero_locus_eq_radical, p.is_prime.radical],
+  end,
+  right_inv := λ s, begin 
+    ext1,
+    dsimp only [order_dual.to_dual, order_dual.of_dual, equiv.coe_refl, id, subtype.coe_mk],
+    rw [prime_spectrum.zero_locus_vanishing_ideal_eq_closure],
+    exact s.2.1.closure_eq,
+  end,
+  map_rel_iff' := begin 
+    intros p q, 
+    simp only [equiv.coe_fn_mk, order_dual.to_dual_le_to_dual, subtype.mk_le_mk, set.le_eq_subset],
+    rw [prime_spectrum.zero_locus_subset_zero_locus_iff, q.is_prime.radical],
+    refl,
+  end }
 
 /--
 If `R ⟶ S` is a surjective ring homomorphism, then `ring_krull_dim S ≤ ring_krull_dim R`.
