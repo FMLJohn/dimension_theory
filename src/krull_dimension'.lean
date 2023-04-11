@@ -205,6 +205,9 @@ lemma no_top_order_of_strict_mono (f : α → β) (hf : strict_mono f) [no_top_o
 lemma krull_dim_le_of_strict_mono (f : α → β) (hf : strict_mono f) : krull_dim α ≤ krull_dim β :=
 supr_le $ λ p, le_Sup ⟨p.map _ hf, rfl⟩
 
+lemma height_mono {a b : α} (h : a ≤ b) : height a ≤ height b :=
+krull_dim_le_of_strict_mono (λ x, ⟨x, le_trans x.2 h⟩) $ λ _ _ h, h
+
 lemma krull_dim_le_of_strict_comono_and_surj 
   (f : α → β) (hf : strict_comono f) (hf' : function.surjective f) : krull_dim β ≤ krull_dim α :=
 supr_le $ λ p, le_Sup ⟨p.comap _ hf hf', rfl⟩
@@ -281,6 +284,9 @@ instance (F : Type*) [field F] : order_top (strict_chain (prime_spectrum F)) :=
 lemma eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 :=
 krull_dim_eq_len_of_order_top (prime_spectrum F)
 
+/--
+Any PID that is not a field is finite dimensional with dimension 1
+-/
 @[simps]
 def PID_finite_dimensional (R : Type*) [comm_ring R] [is_principal_ideal_ring R] [is_domain R] 
   (hR : ¬ is_field R) :
@@ -291,17 +297,13 @@ def PID_finite_dimensional (R : Type*) [comm_ring R] [is_principal_ideal_ring R]
       ⟨(ideal.exists_maximal R).some, (ideal.exists_maximal R).some_spec.is_prime⟩⟩,
     strict_mono' := λ i j h, 
     begin 
-      fin_cases i;
-      fin_cases j;
+      fin_cases i; fin_cases j;
       try { refine (ne_of_lt h rfl).elim <|> refine (not_lt_of_lt h fin.zero_lt_one).elim },
       simpa only [fin_two_arrow_equiv_symm_apply, matrix.cons_val_zero, matrix.cons_val_one, 
         matrix.head_cons] using ideal.bot_lt_of_maximal _ hR,
       exact (ideal.exists_maximal R).some_spec,
     end },
-  le_top := begin 
-    rintros ⟨l, f, m⟩,  
-    dsimp only [strict_chain.le_def],
-    by_contra rid,
+  le_top := λ ⟨l, f, m⟩, show l ≤ 1, from decidable.by_contradiction $ λ rid, begin 
     rw not_le at rid,
     haveI : fact (2 ≤ l + 1) := ⟨by linarith⟩,
     haveI : fact (3 ≤ l + 1) := ⟨by linarith⟩,
@@ -346,6 +348,23 @@ begin
   rw [ring_krull_dim, @@krull_dim_eq_len_of_order_top _ _ (PID_finite_dimensional _ hR)],
   refl,
 end
+
+/--
+https://stacks.math.columbia.edu/tag/00KG
+-/
+lemma eq_sup_height_maximal_ideals (R : Type*) [comm_ring R] :
+  ring_krull_dim R = ⨆ (p : prime_spectrum R) (hp : p.as_ideal.is_maximal), height p :=
+(krull_dim_eq_supr_height _).trans $ le_antisymm (supr_le $ λ p, begin
+  let q : prime_spectrum R := ⟨(p.as_ideal.exists_le_maximal p.is_prime.1).some, 
+    (p.as_ideal.exists_le_maximal _).some_spec.1.is_prime⟩,
+  refine le_trans _ (le_Sup ⟨q, supr_pos ((p.as_ideal.exists_le_maximal _).some_spec.1)⟩),
+  exact height_mono (p.as_ideal.exists_le_maximal _).some_spec.2,
+end) begin 
+  rw [show (⨆ (a : prime_spectrum R), height a) = ⨆ (a : prime_spectrum R) (h : true), height a, 
+    by simp only [csupr_pos]],
+  exact supr_le_supr_of_subset (λ x _, ⟨⟩),
+end
+
 /--
 Suppose `I` is a prime ideal of `R`, then there is a canonical map from
 `prime_spectrum (localization.at_prime I.as_ideal)` to `set.Iic I`.
