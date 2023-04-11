@@ -358,5 +358,20 @@ begin
   rw [ring_krull_dim, @@krull_dim_eq_len_of_order_top _ _ (PID_finite_dimensional _ hR)],
   refl,
 end
+/--
+Suppose `I` is a prime ideal of `R`, then there is a canonical map from
+`prime_spectrum (localization.at_prime I.as_ideal)` to `set.Iic I`.
+-/
+def localization_prime_spectrum_comap (R : Type*) [comm_ring R] (I : prime_spectrum R) :
+  prime_spectrum (localization.at_prime I.as_ideal) → (set.Iic I) :=
+  λ J, ⟨⟨J.as_ideal.comap (algebra_map R (localization.at_prime I.as_ideal)), ideal.is_prime.comap _⟩,
+  λ z hz, @@decidable.by_contradiction (classical.dec _) $ λ hnz, J.is_prime.ne_top $ eq_top_iff.mpr $
+    false.elim $ J.is_prime.1 $ (ideal.eq_top_iff_one _).mpr begin
+      rw [show (1 : localization.at_prime I.as_ideal) = localization.mk z 1 * localization.mk 1
+        ⟨z, hnz⟩, from _],
+      refine ideal.mul_mem_right _ _ hz,
+      rw [localization.mk_mul, mul_one, one_mul, localization.mk_eq_mk', is_localization.eq_mk'_iff_mul_eq,
+        one_mul, subtype.coe_mk],
+    end⟩
 
 end ring_krull_dim
