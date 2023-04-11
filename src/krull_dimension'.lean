@@ -5,6 +5,8 @@ import tactic.linarith
 import algebraic_geometry.prime_spectrum.basic
 import ring_theory.ideal.basic
 
+import .fin_lemmas
+
 /--
 `α, β` preodered sets
 --- 
@@ -297,26 +299,20 @@ def PID_finite_dimensional (R : Type*) [comm_ring R] [is_principal_ideal_ring R]
       exact (ideal.exists_maximal R).some_spec,
     end },
   le_top := begin 
-    rintros ⟨l, f, m⟩,
+    rintros ⟨l, f, m⟩,  
     dsimp only [strict_chain.le_def],
     by_contra rid,
     rw not_le at rid,
+    haveI : fact (2 ≤ l + 1) := ⟨by linarith⟩,
+    haveI : fact (3 ≤ l + 1) := ⟨by linarith⟩,
+    
     let a := submodule.is_principal.generator (f 1).as_ideal,
     let b := submodule.is_principal.generator (f 2).as_ideal,
     have lt1 : ideal.span {a} < ideal.span {b},
     { rw [ideal.span_singleton_generator, ideal.span_singleton_generator],
-      refine m _,
-      rw [show (2 : fin (l + 1)) = 1 + 1, from _, fin.lt_add_one_iff, show (1 : fin (l + 1)) = 
-        ⟨1, rid.trans $ lt_add_one _⟩, from _],
-      { exact rid },
-      { ext, rw [fin.coe_one', fin.coe_mk, ← nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid), 
-          nat.one_mod], },
-      { ext, 
-        rw [fin.coe_add_eq_ite, fin.coe_one',  ← nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid), 
-          nat.one_mod, if_neg, show 1 + 1 = 2, from rfl],
-        work_on_goal 2 { push_neg, rwa [nat.succ_pred_eq_of_pos, add_lt_add_iff_right], linarith },
-        refine fin.coe_val_of_lt _,
-        rwa [nat.one_mod, add_lt_add_iff_right, nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid)], }, },
+      refine m (_ : fin.val _ < fin.val _),
+      rw [fin.one_val_eq_of_le, fin.two_val_eq_of_le],
+      exact one_lt_two, },
     rw ideal.span_singleton_lt_span_singleton at lt1,
     rcases lt1 with ⟨h, ⟨r, hr1, hr2⟩⟩,
     have ha : prime a := submodule.is_principal.prime_generator_of_is_prime (f 1).as_ideal _,
@@ -331,24 +327,16 @@ def PID_finite_dimensional (R : Type*) [comm_ring R] [is_principal_ideal_ring R]
         rw h at this,
         refine (not_le_of_lt this bot_le).elim },
       change (0 : fin _).1 < (2 : fin _).1,
-      rw [fin.val_zero, show (2 : fin (l + 1)) = 1 + 1, from _, fin.val_eq_coe, fin.coe_add_eq_ite, 
-          ← nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid), fin.coe_one', nat.one_mod, if_neg],
-      { linarith, },
-      { rw [nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid)], push_neg, rwa [add_lt_add_iff_right], },
-      { ext, 
-        rw [fin.coe_add_eq_ite, fin.coe_one',  ← nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid), 
-          nat.one_mod, if_neg, show 1 + 1 = 2, from rfl],
-        work_on_goal 2 { push_neg, rwa [nat.succ_pred_eq_of_pos, add_lt_add_iff_right], linarith },
-        refine fin.coe_val_of_lt _,
-        rwa [nat.one_mod, add_lt_add_iff_right, nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid)], }, },
+      rw [fin.val_zero, fin.two_val_eq_of_le],
+      exact zero_lt_two, },
     { intros h,
       suffices : (0 : fin (l + 1)) < 1,
       { have : (f 0).as_ideal < (f 1).as_ideal := m this,
         rw h at this,
         refine (not_le_of_lt this bot_le).elim },
       change (0 : fin _).1 < (1 : fin _).1,
-      rw [fin.val_zero, fin.one_val, ← nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid), nat.one_mod],
-      linarith, },
+      rw [fin.val_zero, fin.one_val_eq_of_le],
+      exact zero_lt_one, },
   end }
 
 lemma PID_eq_one_of_not_field (R : Type*) [comm_ring R] [is_principal_ideal_ring R] [is_domain R] 
