@@ -237,34 +237,25 @@ If `R ⟶ S` is a surjective ring homomorphism, then `ring_krull_dim S ≤ ring_
 -/
 theorem le_of_surj (R S : Type*) [comm_ring R] [comm_ring S] (f : R →+* S)
   (hf : function.surjective f) : ring_krull_dim S ≤ ring_krull_dim R :=
-begin
-  have hcmf : monotone (prime_spectrum.comap f),
-    intros I J hIJ,
-    exact ideal.comap_mono hIJ,
-  exact krull_dim_le_of_strict_mono (prime_spectrum.comap f)
-    (monotone.strict_mono_of_injective hcmf
-      (prime_spectrum.comap_injective_of_surjective f hf)),
-end
+krull_dim_le_of_strict_mono (prime_spectrum.comap f)
+  (monotone.strict_mono_of_injective (λ _ _ h, ideal.comap_mono h) 
+    (prime_spectrum.comap_injective_of_surjective f hf))
 
 /--
 If `I` is an ideal of `R`, then `ring_krull_dim (R ⧸ I) ≤ ring_krull_dim R`.
 -/
 theorem le_of_quot (I R : Type*) [comm_ring R] (I : ideal R) :
   ring_krull_dim (R ⧸ I) ≤ ring_krull_dim R :=
-begin
-  exact le_of_surj _ _ (ideal.quotient.mk I) ideal.quotient.mk_surjective,
-end
+le_of_surj _ _ (ideal.quotient.mk I) ideal.quotient.mk_surjective
 
 /--
 If `R` and `S` are isomorphic, then `krull_dim R = krull_dim S`.
 -/
 theorem eq_of_isom (R S : Type*) [comm_ring R] [comm_ring S] (e : R ≃+* S) :
   ring_krull_dim R = ring_krull_dim S :=
-begin
-  exact le_antisymm (le_of_surj S R (ring_equiv.symm e)
+le_antisymm (le_of_surj S R (ring_equiv.symm e)
     (equiv_like.surjective (ring_equiv.symm e)))
-      (le_of_surj R S e (equiv_like.surjective e)),
-end
+      (le_of_surj R S e (equiv_like.surjective e))
 
 instance (F : Type*) [field F] : unique (prime_spectrum F) :=
 { default := ⟨⊥, ideal.bot_prime⟩,
@@ -275,24 +266,15 @@ instance (F : Type*) [field F] : unique (prime_spectrum F) :=
   end }
 
 instance (F : Type*) [field F] : order_top (strict_chain (prime_spectrum F)) :=
-{ top := 
-  { len := 0,
-    func := λ _, default,
-    strict_mono' := λ _ _ h, (ne_of_gt h $ subsingleton.elim _ _).elim },
-  le_top := begin 
-    rintros ⟨l, f, h⟩,
-    change l ≤ 0,
-    by_contra rid,
-    push_neg at rid,
-    refine ne_of_gt (@h 0 1 _) (subsingleton.elim _ _),
-    rw [show (0 : fin (l + 1)) = ⟨0, _⟩, from rfl, 
-      show (1 : fin (l + 1)) = ⟨1, lt_add_of_pos_left _ rid⟩, from begin 
-        rw [fin.eq_iff_veq, fin.one_val],
-        dsimp only, 
-        rw [← nat.succ_pred_eq_of_pos rid, nat.one_mod],
-      end], 
-    exact nat.zero_lt_one,
-  end }
+{ top := default,
+  le_top := λ ⟨l, f, h⟩, show l ≤ 0, from decidable.by_contradiction $ λ rid, 
+    ne_of_gt (@h 0 1 begin 
+      simpa only [show (0 : fin (l + 1)) = ⟨0, _⟩, from rfl, 
+        show (1 : fin (l + 1)) = ⟨1, lt_add_of_pos_left _ (not_le.mp rid)⟩, begin 
+          rw [fin.eq_iff_veq, fin.one_val, fin.val_eq_coe, fin.coe_mk, ← nat.succ_pred_eq_of_pos 
+            (not_le.mp rid), nat.one_mod],
+        end] using nat.zero_lt_one,
+    end) (subsingleton.elim _ _) }
 
 lemma eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 :=
 krull_dim_eq_len_of_order_top (prime_spectrum F)
