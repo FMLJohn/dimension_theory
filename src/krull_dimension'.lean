@@ -244,14 +244,14 @@ krull_dim_le_of_strict_mono (prime_spectrum.comap f)
 /--
 If `I` is an ideal of `R`, then `ring_krull_dim (R ⧸ I) ≤ ring_krull_dim R`.
 -/
-theorem le_of_quot (I R : Type*) [comm_ring R] (I : ideal R) :
-  ring_krull_dim (R ⧸ I) ≤ ring_krull_dim R :=
-le_of_surj _ _ (ideal.quotient.mk I) ideal.quotient.mk_surjective
+theorem le_of_quot (R : Type*) [comm_ring R] (I : prime_spectrum R) :
+  ring_krull_dim (R ⧸ I.as_ideal) ≤ ring_krull_dim R :=
+le_of_surj _ _ (ideal.quotient.mk I.as_ideal) ideal.quotient.mk_surjective
 
 /--
 If `R` and `S` are isomorphic, then `krull_dim R = krull_dim S`.
 -/
-theorem eq_of_isom (R S : Type*) [comm_ring R] [comm_ring S] (e : R ≃+* S) :
+theorem eq_of_ring_equiv (R S : Type*) [comm_ring R] [comm_ring S] (e : R ≃+* S) :
   ring_krull_dim R = ring_krull_dim S :=
 le_antisymm (le_of_surj S R (ring_equiv.symm e)
     (equiv_like.surjective (ring_equiv.symm e)))
@@ -280,9 +280,19 @@ lemma eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 :=
 krull_dim_eq_len_of_order_top (prime_spectrum F)
 
 /--
-If `I` is a prime ideal of `R`, then we can embed `R` into `localizaiton.at_prime I`.
+Suppose `I` is a prime ideal of `R`, then there is a canonical map from
+`prime_spectrum (localization.at_prime I.as_ideal)` to `set.Iic I`.
 -/
-def localization_embedding (R I : Type*) [comm_ring R] [I : ideal R] [I.is_prime]:
-  R → (localization.at_prime I) := λ r, (localization.mk r 1)
+def localization_prime_spectrum_comap (R : Type*) [comm_ring R] (I : prime_spectrum R) :
+  prime_spectrum (localization.at_prime I.as_ideal) → (set.Iic I) :=
+  λ J, ⟨⟨J.as_ideal.comap (algebra_map R (localization.at_prime I.as_ideal)), ideal.is_prime.comap _⟩,
+  λ z hz, @@decidable.by_contradiction (classical.dec _) $ λ hnz, J.is_prime.ne_top $ eq_top_iff.mpr $
+    false.elim $ J.is_prime.1 $ (ideal.eq_top_iff_one _).mpr begin
+      rw [show (1 : localization.at_prime I.as_ideal) = localization.mk z 1 * localization.mk 1
+        ⟨z, hnz⟩, from _],
+      refine ideal.mul_mem_right _ _ hz,
+      rw [localization.mk_mul, mul_one, one_mul, localization.mk_eq_mk', is_localization.eq_mk'_iff_mul_eq,
+        one_mul, subtype.coe_mk],
+    end⟩
 
 end ring_krull_dim
