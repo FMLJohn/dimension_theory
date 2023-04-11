@@ -297,4 +297,10 @@ instance (F : Type*) [field F] : order_top (strict_chain (prime_spectrum F)) :=
 lemma eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 :=
 krull_dim_eq_len_of_order_top (prime_spectrum F)
 
+/--
+If `I` is a prime ideal of `R`, then we can embed `R` into `localizaiton.at_prime I`.
+-/
+def localization_embedding (R I : Type*) [comm_ring R] [I : ideal R] [I.is_prime]:
+  R → (localization.at_prime I) := λ r, (localization.mk r 1)
+
 end ring_krull_dim
