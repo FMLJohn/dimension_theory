@@ -244,14 +244,14 @@ krull_dim_le_of_strict_mono (prime_spectrum.comap f)
 /--
 If `I` is an ideal of `R`, then `ring_krull_dim (R ⧸ I) ≤ ring_krull_dim R`.
 -/
-theorem le_of_quot (I R : Type*) [comm_ring R] (I : ideal R) :
-  ring_krull_dim (R ⧸ I) ≤ ring_krull_dim R :=
-le_of_surj _ _ (ideal.quotient.mk I) ideal.quotient.mk_surjective
+theorem le_of_quot (R : Type*) [comm_ring R] (I : prime_spectrum R) :
+  ring_krull_dim (R ⧸ I.as_ideal) ≤ ring_krull_dim R :=
+le_of_surj _ _ (ideal.quotient.mk I.as_ideal) ideal.quotient.mk_surjective
 
 /--
 If `R` and `S` are isomorphic, then `krull_dim R = krull_dim S`.
 -/
-theorem eq_of_isom (R S : Type*) [comm_ring R] [comm_ring S] (e : R ≃+* S) :
+theorem eq_of_ring_equiv (R S : Type*) [comm_ring R] [comm_ring S] (e : R ≃+* S) :
   ring_krull_dim R = ring_krull_dim S :=
 le_antisymm (le_of_surj S R (ring_equiv.symm e)
     (equiv_like.surjective (ring_equiv.symm e)))
@@ -279,10 +279,84 @@ instance (F : Type*) [field F] : order_top (strict_chain (prime_spectrum F)) :=
 lemma eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 :=
 krull_dim_eq_len_of_order_top (prime_spectrum F)
 
-/--
-If `I` is a prime ideal of `R`, then we can embed `R` into `localizaiton.at_prime I`.
--/
-def localization_embedding (R I : Type*) [comm_ring R] [I : ideal R] [I.is_prime]:
-  R → (localization.at_prime I) := λ r, (localization.mk r 1)
+@[simps]
+def PID_finite_dimensional (R : Type*) [comm_ring R] [is_principal_ideal_ring R] [is_domain R] 
+  (hR : ¬ is_field R) :
+  order_top (strict_chain (prime_spectrum R)) :=
+{ top := 
+  { len := 1,
+    func := (fin_two_arrow_equiv $ prime_spectrum R).symm ⟨⟨⊥, ideal.bot_prime⟩, 
+      ⟨(ideal.exists_maximal R).some, (ideal.exists_maximal R).some_spec.is_prime⟩⟩,
+    strict_mono' := λ i j h, 
+    begin 
+      fin_cases i;
+      fin_cases j;
+      try { refine (ne_of_lt h rfl).elim <|> refine (not_lt_of_lt h fin.zero_lt_one).elim },
+      simpa only [fin_two_arrow_equiv_symm_apply, matrix.cons_val_zero, matrix.cons_val_one, 
+        matrix.head_cons] using ideal.bot_lt_of_maximal _ hR,
+      exact (ideal.exists_maximal R).some_spec,
+    end },
+  le_top := begin 
+    rintros ⟨l, f, m⟩,
+    dsimp only [strict_chain.le_def],
+    by_contra rid,
+    rw not_le at rid,
+    let a := submodule.is_principal.generator (f 1).as_ideal,
+    let b := submodule.is_principal.generator (f 2).as_ideal,
+    have lt1 : ideal.span {a} < ideal.span {b},
+    { rw [ideal.span_singleton_generator, ideal.span_singleton_generator],
+      refine m _,
+      rw [show (2 : fin (l + 1)) = 1 + 1, from _, fin.lt_add_one_iff, show (1 : fin (l + 1)) = 
+        ⟨1, rid.trans $ lt_add_one _⟩, from _],
+      { exact rid },
+      { ext, rw [fin.coe_one', fin.coe_mk, ← nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid), 
+          nat.one_mod], },
+      { ext, 
+        rw [fin.coe_add_eq_ite, fin.coe_one',  ← nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid), 
+          nat.one_mod, if_neg, show 1 + 1 = 2, from rfl],
+        work_on_goal 2 { push_neg, rwa [nat.succ_pred_eq_of_pos, add_lt_add_iff_right], linarith },
+        refine fin.coe_val_of_lt _,
+        rwa [nat.one_mod, add_lt_add_iff_right, nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid)], }, },
+    rw ideal.span_singleton_lt_span_singleton at lt1,
+    rcases lt1 with ⟨h, ⟨r, hr1, hr2⟩⟩,
+    have ha : prime a := submodule.is_principal.prime_generator_of_is_prime (f 1).as_ideal _,
+    have hb : prime b := submodule.is_principal.prime_generator_of_is_prime (f 2).as_ideal _,
+    { obtain ⟨x, hx⟩ := (hb.dvd_prime_iff_associated ha).mp ⟨r, hr2⟩,
+      rw ←hx at hr2,
+      rw ← mul_left_cancel₀ h hr2 at hr1, 
+      refine (hr1 x.is_unit).elim },
+    { intros h,
+      suffices : (0 : fin (l + 1)) < 2,
+      { have : (f 0).as_ideal < (f 2).as_ideal := m this,
+        rw h at this,
+        refine (not_le_of_lt this bot_le).elim },
+      change (0 : fin _).1 < (2 : fin _).1,
+      rw [fin.val_zero, show (2 : fin (l + 1)) = 1 + 1, from _, fin.val_eq_coe, fin.coe_add_eq_ite, 
+          ← nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid), fin.coe_one', nat.one_mod, if_neg],
+      { linarith, },
+      { rw [nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid)], push_neg, rwa [add_lt_add_iff_right], },
+      { ext, 
+        rw [fin.coe_add_eq_ite, fin.coe_one',  ← nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid), 
+          nat.one_mod, if_neg, show 1 + 1 = 2, from rfl],
+        work_on_goal 2 { push_neg, rwa [nat.succ_pred_eq_of_pos, add_lt_add_iff_right], linarith },
+        refine fin.coe_val_of_lt _,
+        rwa [nat.one_mod, add_lt_add_iff_right, nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid)], }, },
+    { intros h,
+      suffices : (0 : fin (l + 1)) < 1,
+      { have : (f 0).as_ideal < (f 1).as_ideal := m this,
+        rw h at this,
+        refine (not_le_of_lt this bot_le).elim },
+      change (0 : fin _).1 < (1 : fin _).1,
+      rw [fin.val_zero, fin.one_val, ← nat.succ_pred_eq_of_pos (lt_trans zero_lt_one rid), nat.one_mod],
+      linarith, },
+  end }
+
+lemma PID_eq_one_of_not_field (R : Type*) [comm_ring R] [is_principal_ideal_ring R] [is_domain R] 
+  (hR : ¬ is_field R) :
+  ring_krull_dim R = 1 :=
+begin 
+  rw [ring_krull_dim, @@krull_dim_eq_len_of_order_top _ _ (PID_finite_dimensional _ hR)],
+  refl,
+end
 
 end ring_krull_dim
