@@ -1,7 +1,6 @@
 import order.monotone.basic
 import order.with_bot
 import data.fin.basic
-import tactic.linarith
 import algebraic_geometry.prime_spectrum.basic
 import ring_theory.ideal.basic
 
@@ -104,6 +103,86 @@ le_antisymm (H2.le_top H1.top) (H1.le_top H2.top)
 
 variables {α β}
 
+@[simps]
+def reverse (i : strict_chain α) : strict_chain αᵒᵈ :=
+{ len := i.len,
+  func := i ∘ (has_sub.sub ⟨i.len, lt_add_one _⟩),
+  strict_mono' := λ j k h, i.strict_mono' begin
+    rw [fin.lt_def, fin.sub_def, fin.sub_def],
+    dsimp only,
+    zify,
+    rw [int.coe_nat_sub (by linarith [j.2] : j.1 ≤ i.len + 1), 
+      int.coe_nat_sub (by linarith [k.2] : k.1 ≤ i.len + 1)],
+    rw [int.coe_nat_add, int.coe_nat_one, add_sub_left_comm, int.add_mod_self_left,
+      add_sub_left_comm, int.add_mod_self_left, int.mod_eq_of_lt, int.mod_eq_of_lt],
+    { refine int.sub_lt_sub_left _ _, exact_mod_cast h, },
+    { refine sub_nonneg_of_le _, linarith [j.2], },
+    { rw [sub_eq_add_neg], 
+      refine int.add_lt_add_left _ _,
+      rw neg_lt,
+      refine lt_of_lt_of_le neg_one_lt_zero _,
+      norm_num, },
+    { refine sub_nonneg_of_le _, linarith [k.2], },
+    { rw [sub_eq_add_neg], 
+      refine int.add_lt_add_left _ _,
+      rw neg_lt,
+      refine lt_of_lt_of_le neg_one_lt_zero _,
+      norm_num, },
+  end }
+
+@[simps]
+def cons (p : strict_chain α) (a : α) (h : a < p 0) : strict_chain α :=
+{ len := p.len + 1,
+  func := fin.cons a p,
+  strict_mono' := λ i,
+  begin 
+    refine fin.cases _ _ i,
+    { intros j, 
+      refine fin.cases _ _ j,
+      { intros r, rw lt_self_iff_false at r, cases r },
+      { intros k hk, 
+        rw [fin.cons_zero, fin.cons_succ], 
+        exact lt_of_lt_of_le h (p.strict_mono'.monotone $ by norm_num), }, },
+    { intros i' j,
+      refine fin.cases _ _ j,
+      { intros r, cases not_lt_of_lt r (fin.succ_pos i'), },
+      { intros k hk, 
+        rw [fin.cons_succ, fin.cons_succ], 
+        refine p.strict_mono' _,
+        rwa fin.succ_lt_succ_iff at hk, }, },
+  end }
+
+lemma cons_zero (p : strict_chain α) (a : α) (h : a < p 0) : p.cons a h 0 = a :=
+by simp only [cons_func, fin.cons_zero]
+
+@[simps]
+def snoc (p : strict_chain α) (a : α) (h : p ⟨p.len, lt_add_one _⟩ < a) : strict_chain α :=
+{ len := p.len + 1,
+  func := fin.snoc p a,
+  strict_mono' := λ i j H, begin
+    rw [fin.snoc, fin.snoc],
+    by_cases h1 : j.1 < p.len + 1,
+    { rw [dif_pos ((show i.1 < j.1, from H).trans h1), dif_pos h1, cast_eq, cast_eq],
+      exact p.strict_mono' H },
+    { rw [dif_neg h1, cast_eq],
+      split_ifs with h2,
+      { rw [cast_eq], 
+        refine lt_of_le_of_lt (p.strict_mono'.monotone _) h,
+        change i.1 ≤ p.len,
+        linarith },
+      { change i.1 < j.1 at H,
+        have hi := i.2,
+        have hj := j.2,
+        push_neg at h2 h1,
+        refine (ne_of_lt H _).elim,
+        rw [show i.1 = p.len + 1, from _, show j.1 = p.len + 1, from _];
+        linarith, }, },
+  end }
+
+lemma snoc_last (p : strict_chain α) (a : α) (h : p ⟨p.len, lt_add_one _⟩ < a) :
+  p.snoc a h ⟨p.len + 1, lt_add_one _⟩ = a := 
+by simp only [fin.snoc, lt_self_iff_false, not_false_iff, snoc_func, cast_eq, dif_neg]
+
 /--
 For two pre-ordered sets `α, β`, if `f : α → β` is strictly monotonic, then a strict chain of `α` 
 can be pushed out to a strict chain of `β` by 
@@ -157,6 +236,11 @@ Height of an element `a` of a pre-ordered set `α` is the Krull dimension of the
 -/
 @[reducible] def height (a : α) : ℕ±∞ := krull_dim (set.Iic a)
 
+/--
+Coheight of an element `a` of a pre-ordered set `α` is the Krull dimension of the subset `[a, +∞)`
+-/
+@[reducible] def coheight (a : α) : ℕ±∞ := krull_dim (set.Ici a)
+
 variable (α)
 
 lemma krull_dim_eq_bot_of_is_empty [is_empty α] : krull_dim α = ⊥ :=
@@ -208,6 +292,10 @@ supr_le $ λ p, le_Sup ⟨p.map _ hf, rfl⟩
 lemma height_mono {a b : α} (h : a ≤ b) : height a ≤ height b :=
 krull_dim_le_of_strict_mono (λ x, ⟨x, le_trans x.2 h⟩) $ λ _ _ h, h
 
+lemma coheight_antitone {a b : α} (h : a ≤ b) : coheight b ≤ coheight a :=
+supr_le $ λ p, le_Sup ⟨⟨p.len, (λ (x : set.Ici b), ⟨x, le_trans h x.2⟩) ∘ p, strict_mono.comp 
+  (λ i j h, h) p.strict_mono'⟩, rfl⟩
+
 lemma krull_dim_le_of_strict_comono_and_surj 
   (f : α → β) (hf : strict_comono f) (hf' : function.surjective f) : krull_dim β ≤ krull_dim α :=
 supr_le $ λ p, le_Sup ⟨p.comap _ hf hf', rfl⟩
@@ -227,29 +315,7 @@ le_antisymm (supr_le $ λ i, le_supr_of_le (i ⟨i.len, lt_add_one _⟩) $ le_Su
 supr_le $ λ a, krull_dim_le_of_strict_mono subtype.val $ λ _ _ h, h
 
 lemma krull_dim_le_order_dual : krull_dim α ≤ krull_dim αᵒᵈ :=
-supr_le $ λ i, begin
-  refine le_Sup ⟨⟨i.len, i ∘ (has_sub.sub ⟨i.len, lt_add_one _⟩), λ j k h, i.strict_mono' _⟩, rfl⟩,
-  rw [fin.lt_def, fin.sub_def, fin.sub_def],
-  dsimp only,
-  zify,
-  rw [int.coe_nat_sub (by linarith [j.2] : j.1 ≤ i.len + 1), 
-    int.coe_nat_sub (by linarith [k.2] : k.1 ≤ i.len + 1)],
-  rw [int.coe_nat_add, int.coe_nat_one, add_sub_left_comm, int.add_mod_self_left,
-    add_sub_left_comm, int.add_mod_self_left, int.mod_eq_of_lt, int.mod_eq_of_lt],
-  { refine int.sub_lt_sub_left _ _, exact_mod_cast h, },
-  { refine sub_nonneg_of_le _, linarith [j.2], },
-  { rw [sub_eq_add_neg], 
-    refine int.add_lt_add_left _ _,
-    rw neg_lt,
-    refine lt_of_lt_of_le neg_one_lt_zero _,
-    norm_num, },
-  { refine sub_nonneg_of_le _, linarith [k.2], },
-  { rw [sub_eq_add_neg], 
-    refine int.add_lt_add_left _ _,
-    rw neg_lt,
-    refine lt_of_lt_of_le neg_one_lt_zero _,
-    norm_num, },
-end
+supr_le $ λ i, le_Sup $ ⟨i.reverse, rfl⟩
 
 lemma krull_dim_order_dual_le : krull_dim αᵒᵈ ≤ krull_dim α :=
 (krull_dim_le_order_dual _).trans $ krull_dim_le_of_strict_mono 
@@ -259,6 +325,62 @@ lemma krull_dim_eq_order_dual : krull_dim α = krull_dim αᵒᵈ :=
 le_antisymm (krull_dim_le_order_dual _) $ krull_dim_order_dual_le _
 
 end preorder
+
+section partial_order
+
+section height_and_coheight
+
+variables [partial_order α]
+
+lemma height_eq (a : α) : 
+  height a = ⨆ (p : strict_chain α) (hp : p ⟨p.len, lt_add_one _⟩ = a), p.len := 
+le_antisymm (supr_le $ λ p, le_supr_iff.mpr $ λ m h, begin 
+  by_cases hp : p ⟨p.len, lt_add_one _⟩ = ⟨a, le_refl _⟩,
+  { specialize h ⟨p.len, λ i, p i, λ _ _ h, p.strict_mono' h⟩,
+    rwa [supr_pos] at h,
+    rwa subtype.ext_iff at hp, },
+  { have hp' : p ⟨p.len, lt_add_one _⟩ < ⟨a, le_refl _⟩,
+    { exact lt_of_le_of_ne ((p _).2) hp, },
+    let q := p.snoc ⟨a, le_refl _⟩ hp',
+    specialize h ⟨q.len, λ i, q i, λ _ _ h, q.strict_mono' h⟩,
+    rw [supr_pos] at h,
+    work_on_goal 2 { exact subtype.ext_iff_val.mp (p.snoc_last ⟨a, le_refl _⟩ hp'), },
+    refine le_trans _ h,
+    dsimp,
+    erw [with_bot.coe_le_coe],
+    norm_cast,
+    linarith, },
+end) $ supr_le $ λ p, supr_le $ λ hp, le_Sup ⟨⟨_, λ i, ⟨p i, hp ▸ p.strict_mono'.monotone begin 
+  change i.1 ≤ p.len,
+  linarith [i.2]
+end⟩, λ _ _ h, p.strict_mono' h⟩, rfl⟩
+
+lemma coheight_eq (a : α) :
+  coheight a = ⨆ (p : strict_chain α) (hp : p 0 = a), p.len :=
+le_antisymm (supr_le $ λ p, le_supr_iff.mpr $ λ m h, begin 
+  by_cases hp : p 0 = ⟨a, le_refl _⟩,
+  { specialize h ⟨p.len, λ i, p i, λ _ _ h, p.strict_mono' h⟩,
+    rwa [supr_pos] at h,
+    rwa subtype.ext_iff at hp, },
+  { have hp' : (⟨a, le_refl _⟩ : set.Ici a) < p 0,
+    { exact lt_of_le_of_ne (p _).2 (ne.symm hp), },
+    let q := p.cons ⟨a, le_refl _⟩ hp',
+    specialize h ⟨q.len, λ i, q i, λ _ _ h, q.strict_mono' h⟩,
+    rw [supr_pos] at h,
+    work_on_goal 2 { exact subtype.ext_iff_val.mp (p.cons_zero ⟨a, le_refl _⟩ hp'), },
+    refine le_trans _ h,
+    dsimp,
+    erw [with_bot.coe_le_coe],
+    norm_cast,
+    linarith },
+end) $ supr_le $ λ p, supr_le $ λ hp, le_Sup ⟨⟨_, λ i, ⟨p i, hp ▸ p.strict_mono'.monotone begin 
+  change 0 ≤ i.1,
+  norm_num,
+end⟩, λ _ _ h, p.strict_mono' h⟩, rfl⟩
+
+end height_and_coheight
+
+end partial_order
 
 /--
 Krull dimension of a topological space is the supremum of length of chains of closed irreducible 
