@@ -226,6 +226,38 @@ le_antisymm (supr_le $ λ i, le_supr_of_le (i ⟨i.len, lt_add_one _⟩) $ le_Su
   end⟩, i.strict_mono'⟩, rfl⟩) $ 
 supr_le $ λ a, krull_dim_le_of_strict_mono subtype.val $ λ _ _ h, h
 
+lemma krull_dim_le_order_dual : krull_dim α ≤ krull_dim αᵒᵈ :=
+supr_le $ λ i, begin
+  refine le_Sup ⟨⟨i.len, i ∘ (has_sub.sub ⟨i.len, lt_add_one _⟩), λ j k h, i.strict_mono' _⟩, rfl⟩,
+  rw [fin.lt_def, fin.sub_def, fin.sub_def],
+  dsimp only,
+  zify,
+  rw [int.coe_nat_sub (by linarith [j.2] : j.1 ≤ i.len + 1), 
+    int.coe_nat_sub (by linarith [k.2] : k.1 ≤ i.len + 1)],
+  rw [int.coe_nat_add, int.coe_nat_one, add_sub_left_comm, int.add_mod_self_left,
+    add_sub_left_comm, int.add_mod_self_left, int.mod_eq_of_lt, int.mod_eq_of_lt],
+  { refine int.sub_lt_sub_left _ _, exact_mod_cast h, },
+  { refine sub_nonneg_of_le _, linarith [j.2], },
+  { rw [sub_eq_add_neg], 
+    refine int.add_lt_add_left _ _,
+    rw neg_lt,
+    refine lt_of_lt_of_le neg_one_lt_zero _,
+    norm_num, },
+  { refine sub_nonneg_of_le _, linarith [k.2], },
+  { rw [sub_eq_add_neg], 
+    refine int.add_lt_add_left _ _,
+    rw neg_lt,
+    refine lt_of_lt_of_le neg_one_lt_zero _,
+    norm_num, },
+end
+
+lemma krull_dim_order_dual_le : krull_dim αᵒᵈ ≤ krull_dim α :=
+(krull_dim_le_order_dual _).trans $ krull_dim_le_of_strict_mono 
+  (order_dual.of_dual ∘ order_dual.of_dual) $ λ _ _ h, h 
+
+lemma krull_dim_eq_order_dual : krull_dim α = krull_dim αᵒᵈ :=
+le_antisymm (krull_dim_le_order_dual _) $ krull_dim_order_dual_le _
+
 end preorder
 
 /--
@@ -233,7 +265,7 @@ Krull dimension of a topological space is the supremum of length of chains of cl
 sets.
 -/
 def topological_krull_dim (T : Type*) [topological_space T] : ℕ±∞ :=
-krull_dim { s : set T | is_closed s ∧ is_irreducible s }ᵒᵈ
+krull_dim { s : set T | is_closed s ∧ is_irreducible s }
 
 
 /--
@@ -247,13 +279,15 @@ namespace ring_krull_dim
 
 lemma eq_topological_krull_dim (R : Type*) [comm_ring R] :
   ring_krull_dim R = topological_krull_dim (prime_spectrum R) :=
-krull_dim_eq_of_order_iso 
-{ to_fun := λ p, order_dual.to_dual (⟨prime_spectrum.zero_locus p.as_ideal, 
+eq.symm $ (krull_dim_eq_order_dual _).trans $ krull_dim_eq_of_order_iso $ order_iso.symm 
+{ to_fun := order_dual.to_dual ∘ λ p, ⟨prime_spectrum.zero_locus p.as_ideal, 
     prime_spectrum.is_closed_zero_locus p.as_ideal, 
     (prime_spectrum.is_irreducible_zero_locus_iff _).mpr $ 
-      by simpa only [p.is_prime.radical] using p.is_prime⟩ : { s : set (prime_spectrum R) | is_closed s ∧ is_irreducible s }),
-  inv_fun := λ s, ⟨prime_spectrum.vanishing_ideal (order_dual.of_dual s).1, 
-    prime_spectrum.is_irreducible_iff_vanishing_ideal_is_prime.mp (order_dual.of_dual s).2.2⟩,
+      by simpa only [p.is_prime.radical] using p.is_prime⟩,
+  inv_fun := (λ s, ⟨prime_spectrum.vanishing_ideal s.1, 
+    prime_spectrum.is_irreducible_iff_vanishing_ideal_is_prime.mp s.2.2⟩ : 
+    {s : set (prime_spectrum R) | is_closed s ∧ is_irreducible s} → prime_spectrum R) ∘ 
+    order_dual.of_dual,
   left_inv := λ p, begin 
     ext1,
     dsimp,
@@ -261,7 +295,8 @@ krull_dim_eq_of_order_iso
   end,
   right_inv := λ s, begin 
     ext1,
-    dsimp only [order_dual.to_dual, order_dual.of_dual, equiv.coe_refl, id, subtype.coe_mk],
+    dsimp only [order_dual.to_dual, order_dual.of_dual, equiv.coe_refl, id, subtype.coe_mk, 
+      function.comp_apply],
     rw [prime_spectrum.zero_locus_vanishing_ideal_eq_closure],
     exact s.2.1.closure_eq,
   end,
