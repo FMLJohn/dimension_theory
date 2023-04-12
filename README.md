@@ -128,6 +128,22 @@ krull_dim { s : set T | is_closed s ∧ is_irreducible s }
     ring_krull_dim R = topological_krull_dim (prime_spectrum R) :=
   ```
 
+- A field is zero-dimensional and a PID that is not a field is one dimensional
+
+  ```lean
+  lemma ring_krull_dim.eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 := sorry
+  lemma PID_eq_one_of_not_field (R : Type*) [comm_ring R] [is_principal_ideal_ring R] [is_domain R] 
+  (hR : ¬ is_field R) :
+  ring_krull_dim R = 1 := sorry
+  ```
+
+- The Krull dimension of ring $R$ is equal to supremum of height of maximal ideals [00KG](https://stacks.math.columbia.edu/tag/00KG)
+  
+  ```lean
+  lemma eq_sup_height_maximal_ideals (R : Type*) [comm_ring R] :
+  ring_krull_dim R = ⨆ (p : prime_spectrum R) (hp : p.as_ideal.is_maximal), height p := sorry
+  ```
+
 ## Deprecated approach
 
 In [`krull_dimension.lean`](src/krull_dimension.lean), there is a definition of Krull dimension considering only commutative rings.
