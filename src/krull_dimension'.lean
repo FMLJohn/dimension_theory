@@ -1,9 +1,9 @@
 import order.monotone.basic
-import order.with_bot
 import data.fin.basic
 import algebraic_geometry.prime_spectrum.basic
 import ring_theory.ideal.basic
 
+import .eenat
 import .fin_lemmas
 
 /--
@@ -29,8 +29,6 @@ Important but far away
 -/
 
 noncomputable theory
-
-local notation `ℕ±∞` := with_bot (with_top ℕ)
 
 variables (α β : Type*)
 
@@ -103,6 +101,10 @@ le_antisymm (H2.le_top H1.top) (H1.le_top H2.top)
 
 variables {α β}
 
+/--
+A strict chain `a_0 < a_1 < ... < a_n` in `α` gives a strict chain in `αᵒᵈ` by reversing the chain
+`a_n < a_{n - 1} < ... < a_1 < a_0`.
+-/
 @[simps]
 def reverse (i : strict_chain α) : strict_chain αᵒᵈ :=
 { len := i.len,
@@ -130,6 +132,10 @@ def reverse (i : strict_chain α) : strict_chain αᵒᵈ :=
       norm_num, },
   end }
 
+/--
+given a chain `a_0 < a_1 < ... < a_n` and an `a` that is smaller than `a_0`, there is a chain of 
+length `n+1`: `a < a_0 < a_1 < ... < a_n`.
+-/
 @[simps]
 def cons (p : strict_chain α) (a : α) (h : a < p 0) : strict_chain α :=
 { len := p.len + 1,
@@ -155,6 +161,10 @@ def cons (p : strict_chain α) (a : α) (h : a < p 0) : strict_chain α :=
 lemma cons_zero (p : strict_chain α) (a : α) (h : a < p 0) : p.cons a h 0 = a :=
 by simp only [cons_func, fin.cons_zero]
 
+/--
+given a chain `a_0 < a_1 < ... < a_n` and an `a` that is greater than `a_n`, there is a chain of 
+length `n+1`: `a_0 < a_1 < ... < a_n < a`.
+-/
 @[simps]
 def snoc (p : strict_chain α) (a : α) (h : p ⟨p.len, lt_add_one _⟩ < a) : strict_chain α :=
 { len := p.len + 1,
@@ -182,6 +192,65 @@ def snoc (p : strict_chain α) (a : α) (h : p ⟨p.len, lt_add_one _⟩ < a) : 
 lemma snoc_last (p : strict_chain α) (a : α) (h : p ⟨p.len, lt_add_one _⟩ < a) :
   p.snoc a h ⟨p.len + 1, lt_add_one _⟩ = a := 
 by simp only [fin.snoc, lt_self_iff_false, not_false_iff, snoc_func, cast_eq, dif_neg]
+
+/--
+If a chain has positive length `a_0 < a_1 < ...`, then `a_1 < ...` is another chain
+-/
+@[simps]
+def tail (p : strict_chain α) (h : p.len ≠ 0) : strict_chain α :=
+{ len := p.len.pred,
+  func := λ j, p ⟨j + 1, nat.succ_lt_succ begin 
+    have := j.2, 
+    conv_rhs at this { rw [← nat.succ_eq_add_one, nat.succ_pred_eq_of_pos (nat.pos_of_ne_zero h)] },
+    exact this,
+  end⟩,
+  strict_mono' := λ _ _ H, p.strict_mono' (nat.succ_lt_succ H) }
+
+lemma tail_zero (p : strict_chain α) (h : p.len ≠ 0) : p.tail h 0 = p 1 :=
+begin 
+  rw [tail_func],
+  congr' 1,
+  ext1,
+  dsimp,
+  haveI : fact (2 ≤ p.len + 1),
+  { fconstructor, have := nat.pos_of_ne_zero h, linarith, },
+  rw [zero_add, fin.coe_one_eq_of_le],
+end
+
+/--
+If `a_0 < a_1 < ... < a_n` and `b_0 < b_1 < ... < b_m` are two strict chains such that `a_n < b_0`,
+then there is a chain of length `n + m + 1` given by
+`a_0 < a_1 < ... < a_n < b_0 < b_1 < ... < b_m`.
+-/
+@[simps]
+def append (p q : strict_chain α) (h : p ⟨p.len, lt_add_one _⟩ < q 0) : strict_chain α :=
+{ len := p.len + q.len + 1,
+  func := fin.append p q ∘ fin.congr (p.len + q.len + 1 + 1) ((p.len + 1) + (q.len + 1)) (by abel),
+  strict_mono' := strict_mono.comp begin 
+    refine fin.add_cases (λ i, _) (λ i, _),
+    { refine fin.add_cases (λ j, _) (λ j, _),
+      { intros H, rw [fin.append_left, fin.append_left], exact p.strict_mono' H, },
+      { intros H, 
+        rw [fin.append_left, fin.append_right],
+        have ineq1 : p i ≤ p ⟨p.len, lt_add_one _⟩,
+        { refine p.strict_mono'.monotone _, change i.1 ≤ p.len, linarith [i.2] },
+        have ineq2 : q 0 ≤ q j,
+        { refine q.strict_mono'.monotone _, norm_num },
+        exact lt_of_lt_of_le (lt_of_le_of_lt ineq1 h) ineq2, }, },
+    { refine fin.add_cases (λ j, _) (λ j, _),
+      { intros H, 
+        rw [fin.append_right, fin.append_left],
+        change (p.len + 1) + i.1 < j.1 at H,
+        exfalso,
+        linarith [j.2], },
+      { intros H,
+        rw [fin.append_right, fin.append_right],
+        change fin.val _ < fin.val _ at H,
+        rw [fin.val_eq_coe, fin.coe_nat_add, fin.val_eq_coe, fin.coe_nat_add] at H,
+        refine q.strict_mono' (_ : i.1 < j.1),
+        rw [fin.val_eq_coe, fin.val_eq_coe],
+        linarith, }, },
+  end (order_iso.strict_mono _) }
 
 /--
 For two pre-ordered sets `α, β`, if `f : α → β` is strictly monotonic, then a strict chain of `α` 
@@ -292,9 +361,15 @@ supr_le $ λ p, le_Sup ⟨p.map _ hf, rfl⟩
 lemma height_mono {a b : α} (h : a ≤ b) : height a ≤ height b :=
 krull_dim_le_of_strict_mono (λ x, ⟨x, le_trans x.2 h⟩) $ λ _ _ h, h
 
+lemma height_le_krull_dim (a : α) : height a ≤ krull_dim α :=
+krull_dim_le_of_strict_mono coe $ subtype.strict_mono_coe _
+
 lemma coheight_antitone {a b : α} (h : a ≤ b) : coheight b ≤ coheight a :=
 supr_le $ λ p, le_Sup ⟨⟨p.len, (λ (x : set.Ici b), ⟨x, le_trans h x.2⟩) ∘ p, strict_mono.comp 
   (λ i j h, h) p.strict_mono'⟩, rfl⟩
+
+lemma coheight_le_krull_dim (a : α) : coheight a ≤ krull_dim α :=
+krull_dim_le_of_strict_mono coe $ subtype.strict_mono_coe _
 
 lemma krull_dim_le_of_strict_comono_and_surj 
   (f : α → β) (hf : strict_comono f) (hf' : function.surjective f) : krull_dim β ≤ krull_dim α :=
@@ -303,6 +378,34 @@ supr_le $ λ p, le_Sup ⟨p.comap _ hf hf', rfl⟩
 lemma krull_dim_eq_of_order_iso (f : α ≃o β) : krull_dim α = krull_dim β :=
 le_antisymm (krull_dim_le_of_strict_mono f f.strict_mono) (krull_dim_le_of_strict_comono_and_surj f 
   (λ _ _ h, by convert f.symm.strict_mono h; rw f.symm_apply_apply) f.surjective)
+
+lemma exists_of_nat_lt_krull_dim (n : ℕ) (h : ↑n < krull_dim α) : 
+  ∃ (p : strict_chain α), n < p.len :=
+begin 
+  contrapose! h,
+  refine supr_le (λ p, _),
+  erw [with_bot.coe_le_coe, with_top.coe_le_coe],
+  exact h p,
+end
+
+lemma exists_of_nat_le_krull_dim (n : ℕ) (h : ↑n ≤ krull_dim α) : 
+  ∃ (p : strict_chain α), n ≤ p.len :=
+begin 
+  contrapose! h,
+  by_cases H : is_empty α,
+  { resetI, rw krull_dim_eq_bot_of_is_empty, rw with_bot.bot_lt_iff_ne_bot, norm_num, },
+  rw not_is_empty_iff at H,
+  haveI : inhabited α := classical.inhabited_of_nonempty H,
+  have hn : 0 < n,
+  { specialize h default, linarith },
+  have hn' : n ≠ 0 := by linarith, 
+  simp_rw nat.lt_iff_le_pred hn at h,
+  refine supr_lt_iff.mpr ⟨↑(n - 1), _, λ p, _⟩,
+  { erw [with_bot.coe_lt_coe, with_top.coe_lt_coe],
+    exact nat.pred_lt hn', },
+  erw [with_bot.coe_le_coe, with_top.coe_le_coe],
+  exact h _,
+end
 
 variable (α)
 
@@ -377,6 +480,41 @@ end) $ supr_le $ λ p, supr_le $ λ hp, le_Sup ⟨⟨_, λ i, ⟨p i, hp ▸ p.s
   change 0 ≤ i.1,
   norm_num,
 end⟩, λ _ _ h, p.strict_mono' h⟩, rfl⟩
+
+/--
+Matsumura p.30
+-/
+lemma height_add_coheight_le (a : α) : height a + coheight a ≤ krull_dim α :=
+suffices ∀ (r s : ℕ±∞), r ≤ height a → s ≤ coheight a → r + s ≤ krull_dim α, 
+from this _ _ (le_refl _) (le_refl _), 
+suffices ∀ (r s : ℕ), ↑r ≤ height a → ↑s ≤ coheight a → ↑(r + s) ≤ krull_dim α,
+from λ r s hr hs, begin 
+  induction r using eenat.rec;
+  induction s using eenat.rec;
+  exact bot_le <|> exact hr.trans (height_le_krull_dim _) <|> 
+    exact hs.trans (coheight_le_krull_dim _) <|> exact this r s hr hs,
+end, λ r s hr hs, begin 
+  obtain ⟨p, hp⟩ := exists_of_nat_le_krull_dim _ hr,
+  obtain ⟨q, hq⟩ := exists_of_nat_le_krull_dim _ hs,
+  let p' : strict_chain α := ⟨p.len, λ i, p i, λ _ _ h, p.strict_mono' h⟩,
+  let q' : strict_chain α := ⟨q.len, λ i, q i, λ _ _ h, q.strict_mono' h⟩,
+  by_cases hq' : q'.len = 0,
+  { have eq1 : q.len = 0 := hq',
+    have eq2 : s = 0 := by linarith,
+    rw [eq2, add_zero],
+    exact hr.trans (height_le_krull_dim _) },
+  haveI : fact (2 ≤ q.len + 1),
+  { fconstructor, rw show q.len = q'.len, from rfl, linarith [nat.pos_of_ne_zero hq'], },
+  let c := p'.append (q'.tail hq') begin 
+    rw [strict_chain.tail_zero],
+    exact lt_of_le_of_lt (le_trans (p _).2 (q _).2) (q'.strict_mono' (fin.one_pos_of_le _)),
+  end,
+  refine le_trans _ (le_supr _ c),
+  erw [with_bot.coe_le_coe, with_top.coe_le_coe],
+  rw [show c.len = p'.len + (q'.len.pred) + 1, from rfl, add_assoc, ←nat.succ_eq_add_one, 
+    nat.succ_pred_eq_of_pos (nat.pos_of_ne_zero hq')],
+  exact add_le_add hp hq,
+end     
 
 end height_and_coheight
 

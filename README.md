@@ -121,6 +121,12 @@ krull_dim { s : set T | is_closed s ∧ is_irreducible s }
   coheight a = ⨆ (p : strict_chain α) (hp : p 0 = a), p.len := sorry
   ```
 
+- In a partially ordered set $\alpha$, for every $a \in \alpha$, we have that $\operatorname{ht}(a) + \operatorname{coht}(a) \le \dim \alpha$ [Matsumura, p30].
+  
+  ```lean
+  lemma height_add_coheight_le (a : α) : height a + coheight a ≤ krull_dim α :=
+  ```
+
 - The ring Krull dimension and the topological dimension of the prime spectrum of a ring are the same
 
   ```lean
