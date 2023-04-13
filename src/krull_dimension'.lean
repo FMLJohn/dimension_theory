@@ -19,9 +19,9 @@ General theory
 - `krull_nat_dim` : works for "finite_dim" `[order_top (chain α)]`, `α → ℕ`.
 - `krull_nat_dim = krull_dim` when finite dimensional
 -------
-Theory needs to take place in `Top, Ring, Module` Concerte
+Theory needs to take place in `Top, Ring, Module` concrete
 - (*) imply `R ⟶ S` surjective homomorphism, then `dim S ≤ dim R`;
-- need to show `height 𝔭 = krull_dim (localizaiton.at_prime 𝔭)`
+- need to show `height 𝔭 = krull_dim (localization.at_prime 𝔭)`
 - `coheight` probably doesn't make sense in general preorder
 - `height 𝔭 + coheight 𝔭 ≤ krull_dim R`
 Important but far away
