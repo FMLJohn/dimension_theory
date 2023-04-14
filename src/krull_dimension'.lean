@@ -458,6 +458,24 @@ end) $ supr_le $ λ p, supr_le $ λ hp, le_Sup ⟨⟨_, λ i, ⟨p i, hp ▸ p.s
   linarith [i.2]
 end⟩, λ _ _ h, p.strict_mono' h⟩, rfl⟩
 
+lemma height_eq_zero_of_is_top (a : α) (h : is_bot a) : height a = 0 :=
+le_antisymm (supr_le $ λ p, begin 
+  erw [with_bot.coe_le_coe, with_top.coe_le_coe],
+  by_contra' r,
+  set q : strict_chain α := ⟨p.len, λ i, p i, λ _ _ h, p.strict_mono' h⟩,
+  by_cases H : q ⟨p.len, lt_add_one _⟩ = a,
+  { have ineq1 : q 0 < q ⟨p.len, lt_add_one _⟩ := q.strict_mono' r,
+    rw [H, lt_iff_le_not_le] at ineq1,
+    exact ineq1.2 (h _), },
+  { have H' : q ⟨p.len, lt_add_one _⟩ < a := lt_of_le_of_ne (p _).2 H,
+    set q' : strict_chain α := q.snoc _ H' with q'_eq,
+    have ineq1 : q' ⟨p.len, (lt_add_one _).trans (lt_add_one _)⟩ < q' ⟨p.len + 1, lt_add_one _⟩ := 
+      q'.strict_mono' (lt_add_one _),
+    rw [show q' ⟨p.len + 1, lt_add_one _⟩ = a, from q.snoc_last _ _, lt_iff_le_not_le] at ineq1,
+    exact ineq1.2 (h _), },
+end) $ le_supr_iff.mpr $ λ m hm, hm ⟨0, λ _, ⟨a, le_refl _⟩, λ _ _ h, (not_le.mpr h $ le_of_eq $ 
+  subsingleton.elim _ _).elim⟩
+
 lemma coheight_eq (a : α) :
   coheight a = ⨆ (p : strict_chain α) (hp : p 0 = a), p.len :=
 le_antisymm (supr_le $ λ p, le_supr_iff.mpr $ λ m h, begin 
@@ -480,6 +498,29 @@ end) $ supr_le $ λ p, supr_le $ λ hp, le_Sup ⟨⟨_, λ i, ⟨p i, hp ▸ p.s
   change 0 ≤ i.1,
   norm_num,
 end⟩, λ _ _ h, p.strict_mono' h⟩, rfl⟩
+
+lemma coheight_eq_zero_of_is_top (a : α) (h : is_top a) : coheight a = 0 :=
+le_antisymm (supr_le $ λ p, begin 
+  erw [with_bot.coe_le_coe, with_top.coe_le_coe],
+  by_contra' r,
+  set q : strict_chain α := ⟨p.len, λ i, p i, λ _ _ h, p.strict_mono' h⟩,
+  by_cases H : q 0 = a,
+  { have ineq1 : q 0 < q ⟨p.len, lt_add_one _⟩ := q.strict_mono' r,
+    rw [H, lt_iff_le_not_le] at ineq1,
+    exact ineq1.2 (h _), },
+  { have H' : a < q 0 := lt_of_le_of_ne (p _).2 (ne.symm H),
+    set q' : strict_chain α := q.cons _ H' with q'_eq,
+    have ineq1 : q' 0 < q' 1 := q'.strict_mono' (_ : 0 < 1),
+    work_on_goal 2 { 
+      change 0 < fin.val _,
+      haveI : fact (2 ≤ q'.len + 1),
+      { fconstructor, rw show q'.len = p.len + 1, from rfl, linarith, },
+      rw fin.one_val_eq_of_le,
+      exact nat.zero_lt_one, },
+    rw [show q' 0 = a, from q.cons_zero _ _, lt_iff_le_not_le] at ineq1,
+    exact ineq1.2 (h _), },
+end) $ le_supr_iff.mpr $ λ m hm, hm ⟨0, λ _, ⟨a, le_refl _⟩, λ _ _ h, (not_le.mpr h $ le_of_eq $ 
+  subsingleton.elim _ _).elim⟩
 
 /--
 Matsumura p.30
