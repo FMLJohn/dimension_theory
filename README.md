@@ -146,6 +146,13 @@ krull_dim { s : set T | is_closed s ∧ is_irreducible s }
   ring_krull_dim R = 1 := sorry
   ```
 
+- An Artinian ring is zero-dimensional
+  
+  ```lean
+  lemma eq_zero_of_is_artinian_ring (R : Type*) [comm_ring R] [nontrivial R] [is_artinian_ring R] : 
+  ring_krull_dim R = 0
+  ```
+
 - The Krull dimension of ring $R$ is equal to the supremum of heights of maximal ideals [00KG](https://stacks.math.columbia.edu/tag/00KG)
   
   ```lean

@@ -5,6 +5,7 @@ import ring_theory.ideal.basic
 
 import .eenat
 import .fin_lemmas
+import .artinian
 
 /--
 `α, β` preodered sets
@@ -427,13 +428,17 @@ lemma krull_dim_order_dual_le : krull_dim αᵒᵈ ≤ krull_dim α :=
 lemma krull_dim_eq_order_dual : krull_dim α = krull_dim αᵒᵈ :=
 le_antisymm (krull_dim_le_order_dual _) $ krull_dim_order_dual_le _
 
+lemma krull_dim_nonneg [nonempty α] : 0 ≤ krull_dim α :=
+le_Sup ⟨⟨_, λ _, nonempty.some infer_instance, λ _ _ h, (ne_of_lt h $ subsingleton.elim _ _).elim⟩, 
+  rfl⟩ 
+
 end preorder
 
 section partial_order
 
 section height_and_coheight
 
-variables [partial_order α]
+variables [partial_order α] {α}
 
 lemma height_eq (a : α) : 
   height a = ⨆ (p : strict_chain α) (hp : p ⟨p.len, lt_add_one _⟩ = a), p.len := 
@@ -458,7 +463,7 @@ end) $ supr_le $ λ p, supr_le $ λ hp, le_Sup ⟨⟨_, λ i, ⟨p i, hp ▸ p.s
   linarith [i.2]
 end⟩, λ _ _ h, p.strict_mono' h⟩, rfl⟩
 
-lemma height_eq_zero_of_is_top (a : α) (h : is_bot a) : height a = 0 :=
+lemma height_eq_zero_of_is_bot (a : α) (h : is_bot a) : height a = 0 :=
 le_antisymm (supr_le $ λ p, begin 
   erw [with_bot.coe_le_coe, with_top.coe_le_coe],
   by_contra' r,
@@ -654,6 +659,32 @@ instance (F : Type*) [field F] : order_top (strict_chain (prime_spectrum F)) :=
 
 lemma eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 :=
 krull_dim_eq_len_of_order_top (prime_spectrum F)
+
+lemma eq_zero_of_is_artinian_ring (R : Type*) [comm_ring R] [nontrivial R] [is_artinian_ring R] :
+  ring_krull_dim R = 0 :=
+begin
+  haveI : inhabited (prime_spectrum R) := classical.inhabited_of_nonempty infer_instance,
+  rw [ring_krull_dim, krull_dim_eq_supr_height],
+  suffices : ∀ (a : prime_spectrum R), height a = 0,
+  { simp_rw this, rw [supr_const], },
+  intros p,
+  refine le_antisymm _ (krull_dim_nonneg _),
+  refine supr_le (λ q, _),
+  erw [with_bot.coe_le_coe, with_top.coe_le_coe],
+  by_contra' r,
+  haveI : fact (2 ≤ q.len + 1),
+  { fconstructor, linarith, },
+  have : q 0 < q 1 := q.strict_mono' begin 
+    change 0 < fin.val 1,
+    rw fin.one_val_eq_of_le,
+    exact nat.zero_lt_one,
+  end,
+  haveI H0 : (q 0).1.as_ideal.is_maximal := infer_instance,
+  have EQ : q 0 = q 1,
+  { rw [subtype.ext_iff_val, prime_spectrum.ext_iff], 
+    exact H0.eq_of_le (q 1).1.is_prime.1 (le_of_lt this) },
+  exact (ne_of_lt this EQ),
+end
 
 /--
 Any PID that is not a field is finite dimensional with dimension 1
