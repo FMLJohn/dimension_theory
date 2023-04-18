@@ -1,8 +1,5 @@
 import order.monotone.basic
 import data.fin.basic
-import algebraic_geometry.prime_spectrum.basic
-import ring_theory.ideal.basic
-import algebra.module.localized_module
 
 import .eenat
 import .fin_lemmas
