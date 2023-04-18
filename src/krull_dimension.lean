@@ -1,343 +1,568 @@
+import order.monotone.basic
+import data.fin.basic
+import algebraic_geometry.prime_spectrum.basic
 import ring_theory.ideal.basic
-import ring_theory.localization.at_prime
+import algebra.module.localized_module
+
+import .eenat
+import .fin_lemmas
+import .artinian
+
+/-!
+`α, β` preodered sets
+--- 
+General theory
+- [x] `f : α → β` is strictly monotonic, then `krull_dim α ≤ krull_dim β` by pushing out (using 
+  `strict_chain.map`).
+- [x] `f : α → β` is strictly comonotonic and surjective, then `krull_dim β ≤ krull_dim α` by 
+  pulling back (using `strict_chain.comap`).
+- [x] `height` makes sense for any preodered set.
+- [x] `krull_dim` is equal to supremum of height.
+- `krull_nat_dim` : works for "finite_dim" `[order_top (chain α)]`, `α → ℕ`.
+- `krull_nat_dim = krull_dim` when finite dimensional
+-------
+Theory needs to take place in `Top, Ring, Module` concrete
+- (*) imply `R ⟶ S` surjective homomorphism, then `dim S ≤ dim R`;
+- need to show `height 𝔭 = krull_dim (localization.at_prime 𝔭)`
+- `coheight` probably doesn't make sense in general preorder
+- `height 𝔭 + coheight 𝔭 ≤ krull_dim R`
+Important but far away
+- If `R` is noetherian and local, then `R` is finite dimensional.
+-/
 
 noncomputable theory
 
-variables (R : Type*) [comm_ring R]
+variables (α β : Type*)
+
+section preorder
+
+variables [preorder α] [preorder β]
+
+section strict_comono
+
+variables {α β}
 
 /--
-a chain of prime ideal of length `n` is `𝔭₀ ⊂ 𝔭₁ ⊂ ... ⊂ 𝔭ₙ` where all `𝔭ᵢ`s are prime ideals.
+A function `f : α → β` is said to be strictly comonotonic (dual to strictly monotonic) 
+if and only if `a < b` is implied by `f a < f b` for all `a, b : β`.
 -/
-structure prime_ideal_chain :=
+def strict_comono (f : α → β) : Prop :=
+∀ ⦃a b⦄, f a < f b → a < b
+
+end strict_comono
+
+/--
+For a preordered set `(α, <)`, a strict chain of `α` of length `n` is a strictly monotonic function
+`fin (n + 1) → α`, i.e. `a₀ < a₁ < ... < aₙ` with `a_i : α`.
+-/
+structure strict_chain :=
 (len : ℕ)
-(chain : fin (len + 1) → ideal R)
-(is_chain : strict_mono chain)
-[is_prime : ∀ i, (chain i).is_prime]
+(func : fin (len + 1) → α)
+(strict_mono' : strict_mono func)
 
-namespace prime_ideal_chain
+namespace strict_chain
 
-/--
-If `R` is not the zero ring, then there is at least one prime ideal chain for `R` has a maximal 
-ideal.
--/
-instance [nontrivial R] : nonempty (prime_ideal_chain R) :=
-nonempty.intro
-{ len := 0,
-  chain := λ _, (ideal.exists_maximal R).some,
-  is_chain := by { rintros ⟨i, (hi : i < 1)⟩ ⟨j, (hj : j < 1)⟩ (hij : i < j), exfalso, linarith, },
-  is_prime := λ _, (ideal.exists_maximal R).some_spec.is_prime }
-
-instance [nontrivial R] : inhabited (prime_ideal_chain R) :=
-{ default :=
-  { len := 0,
-    chain := λ _, (ideal.exists_maximal R).some,
-    is_chain := by { rintros ⟨i, (hi : i < 1)⟩ ⟨j, (hj : j < 1)⟩ (hij : i < j), exfalso, linarith, },
-    is_prime := λ _, (ideal.exists_maximal R).some_spec.is_prime } }
+instance : has_coe_to_fun (strict_chain α) (λ x, fin (x.len + 1) → α) :=
+{ coe := λ x, x.func }
 
 /--
-Two prime ideal chains are equal when they have the same length and the same prime ideals.
+The induced ordering on `strict_chain α` is by comparing length of strict chains.
 -/
-@[ext]
-lemma ext (M N : prime_ideal_chain R)
-(len_eq : M.len = N.len)
-(chain_eq : ∀ (i : fin (M.len + 1)), M.chain i = N.chain i) :
-M = N :=
-begin
-cases M with h l m,
-cases N with h' l' m',
-dsimp at *,
-subst len_eq,
-congr,
-ext,
-rw chain_eq,
-norm_num,
-end
+instance : has_le (strict_chain α) :=
+{ le := λ p q, p.len ≤ q.len }
 
-end prime_ideal_chain
+lemma le_def (p q : strict_chain α) : p ≤ q ↔ p.len ≤ q.len := iff.rfl
+
+instance : has_lt (strict_chain α) :=
+{ lt := λ p q, p.len < q.len }
+
+lemma lt_def (p q : strict_chain α) : p < q ↔ p.len < q.len := iff.rfl
+
+instance : preorder (strict_chain α) :=
+{ le := (≤),
+  lt := (<),
+  le_refl := λ a, show a.len ≤ a.len, from le_refl _,
+  le_trans := λ a b c (h : a.len ≤ b.len) (h' : b.len ≤ c.len), show a.len ≤ c.len, from h.trans h',
+  lt_iff_le_not_le := λ a b, @lt_iff_le_not_le ℕ _ a.len b.len }
+
+instance [is_empty α] : is_empty $ strict_chain α :=
+{ false := λ p, @is_empty.elim α (infer_instance : is_empty α) (λ _, false) (p 0) }
+
+instance [inhabited α] : inhabited $ strict_chain α :=
+{ default := ⟨0, λ _, default, λ _ _ h, (ne_of_lt h $ subsingleton.elim _ _).elim⟩ }
+
+instance [nonempty α] : nonempty $ strict_chain α :=
+nonempty.intro ⟨0, λ _, nonempty.some infer_instance, λ _ _ h, (ne_of_lt h $ subsingleton.elim _ _).elim⟩
+
+lemma top_len_unique [order_top (strict_chain α)] (p : strict_chain α) (hp : is_top p) :
+  p.len = (⊤ : strict_chain α).len :=
+le_antisymm (@le_top (strict_chain α) _ _ _) (hp ⊤)
+
+lemma top_len_unique' (H1 H2 : order_top (strict_chain α)) : H1.top.len = H2.top.len :=
+le_antisymm (H2.le_top H1.top) (H1.le_top H2.top)
+
+variables {α β}
 
 /--
-A ring `R` is said to be finite dimensional if there is a prime ideal chain with the maximal length.
-Note that according to this definition, the zero ring is not finite dimensional, for it has no prime
-ideal chains.
+A strict chain `a_0 < a_1 < ... < a_n` in `α` gives a strict chain in `αᵒᵈ` by reversing the chain
+`a_n < a_{n - 1} < ... < a_1 < a_0`.
 -/
-class finite_dimensional_ring : Prop :=
-(fin_dim : ∃ (M : prime_ideal_chain R), ∀ (N : prime_ideal_chain R), N.len ≤ M.len)
+@[simps]
+def reverse (i : strict_chain α) : strict_chain αᵒᵈ :=
+{ len := i.len,
+  func := i ∘ (has_sub.sub ⟨i.len, lt_add_one _⟩),
+  strict_mono' := λ j k h, i.strict_mono' begin
+    rw [fin.lt_def, fin.sub_def, fin.sub_def],
+    dsimp only,
+    zify,
+    rw [int.coe_nat_sub (by linarith [j.2] : j.1 ≤ i.len + 1), 
+      int.coe_nat_sub (by linarith [k.2] : k.1 ≤ i.len + 1)],
+    rw [int.coe_nat_add, int.coe_nat_one, add_sub_left_comm, int.add_mod_self_left,
+      add_sub_left_comm, int.add_mod_self_left, int.mod_eq_of_lt, int.mod_eq_of_lt],
+    { refine int.sub_lt_sub_left _ _, exact_mod_cast h, },
+    { refine sub_nonneg_of_le _, linarith [j.2], },
+    { rw [sub_eq_add_neg], 
+      refine int.add_lt_add_left _ _,
+      rw neg_lt,
+      refine lt_of_lt_of_le neg_one_lt_zero _,
+      norm_num, },
+    { refine sub_nonneg_of_le _, linarith [k.2], },
+    { rw [sub_eq_add_neg], 
+      refine int.add_lt_add_left _ _,
+      rw neg_lt,
+      refine lt_of_lt_of_le neg_one_lt_zero _,
+      norm_num, },
+  end }
 
 /--
-If `R` is not the zero ring, then `R` is finite dimensional iff all prime ideal chains of `R` have
-length bounded by some `n ∈ ℕ`
+given a chain `a_0 < a_1 < ... < a_n` and an `a` that is smaller than `a_0`, there is a chain of 
+length `n+1`: `a < a_0 < a_1 < ... < a_n`.
 -/
-lemma finite_dimensional_ring.iff_len_bounded [nontrivial R] : 
-  finite_dimensional_ring R ↔ 
-  ∃ (n : ℕ), ∀ (N : prime_ideal_chain R), N.len ≤ n :=
-{ mp := λ h, ⟨h.fin_dim.some.len, h.fin_dim.some_spec⟩,
-  mpr := λ h, 
-  { fin_dim := ⟨(@nat.Sup_mem (set.range (prime_ideal_chain.len : prime_ideal_chain R → ℕ))
-      ⟨(default : prime_ideal_chain R).len, ⟨_, rfl⟩⟩ ⟨h.some, begin 
-        rintros _ ⟨x, rfl⟩,
-        exact h.some_spec _,
-      end⟩).some, λ N, begin 
-        classical,
-        generalize_proofs H,
-        rw H.some_spec,
-        rw nat.Sup_def ⟨h.some, _⟩,
-        swap,
-        { rintros _ ⟨m, rfl⟩,
-          refine h.some_spec _, },
-        generalize_proofs H2,
-        exact nat.find_spec H2 _ ⟨_, rfl⟩,
-      end⟩ } }
+@[simps]
+def cons (p : strict_chain α) (a : α) (h : a < p 0) : strict_chain α :=
+{ len := p.len + 1,
+  func := fin.cons a p,
+  strict_mono' := λ i,
+  begin 
+    refine fin.cases _ _ i,
+    { intros j, 
+      refine fin.cases _ _ j,
+      { intros r, rw lt_self_iff_false at r, cases r },
+      { intros k hk, 
+        rw [fin.cons_zero, fin.cons_succ], 
+        exact lt_of_lt_of_le h (p.strict_mono'.monotone $ by norm_num), }, },
+    { intros i' j,
+      refine fin.cases _ _ j,
+      { intros r, cases not_lt_of_lt r (fin.succ_pos i'), },
+      { intros k hk, 
+        rw [fin.cons_succ, fin.cons_succ], 
+        refine p.strict_mono' _,
+        rwa fin.succ_lt_succ_iff at hk, }, },
+  end }
 
+lemma cons_zero (p : strict_chain α) (a : α) (h : a < p 0) : p.cons a h 0 = a :=
+by simp only [cons_func, fin.cons_zero]
 
 /--
-The Krull dimension of a ring is the length of maximal chain if the ring is finite dimensional and 
-0 otherwise.
-Notes on implementation:
-alternatively `krull_dim` should take value in `with_top (with_bot ℕ)` where the zero ring then
-would have dimension negative infinity (`⊥`) and any infinite dimensional ring will have dimension 
-positive infinity (`⊤`).
+given a chain `a_0 < a_1 < ... < a_n` and an `a` that is greater than `a_n`, there is a chain of 
+length `n+1`: `a_0 < a_1 < ... < a_n < a`.
 -/
-def krull_dim : ℕ := 
-@@dite (finite_dimensional_ring R) (classical.dec _) (λ H, H.fin_dim.some.len) (λ _, 0)
+@[simps]
+def snoc (p : strict_chain α) (a : α) (h : p ⟨p.len, lt_add_one _⟩ < a) : strict_chain α :=
+{ len := p.len + 1,
+  func := fin.snoc p a,
+  strict_mono' := λ i j H, begin
+    rw [fin.snoc, fin.snoc],
+    by_cases h1 : j.1 < p.len + 1,
+    { rw [dif_pos ((show i.1 < j.1, from H).trans h1), dif_pos h1, cast_eq, cast_eq],
+      exact p.strict_mono' H },
+    { rw [dif_neg h1, cast_eq],
+      split_ifs with h2,
+      { rw [cast_eq], 
+        refine lt_of_le_of_lt (p.strict_mono'.monotone _) h,
+        change i.1 ≤ p.len,
+        linarith },
+      { change i.1 < j.1 at H,
+        have hi := i.2,
+        have hj := j.2,
+        push_neg at h2 h1,
+        refine (ne_of_lt H _).elim,
+        rw [show i.1 = p.len + 1, from _, show j.1 = p.len + 1, from _];
+        linarith, }, },
+  end }
+
+lemma snoc_last (p : strict_chain α) (a : α) (h : p ⟨p.len, lt_add_one _⟩ < a) :
+  p.snoc a h ⟨p.len + 1, lt_add_one _⟩ = a := 
+by simp only [fin.snoc, lt_self_iff_false, not_false_iff, snoc_func, cast_eq, dif_neg]
 
 /--
-If `R` is finite dimensional, then it has a prime ideal chain with the greatest length.
+If a chain has positive length `a_0 < a_1 < ...`, then `a_1 < ...` is another chain
 -/
-def maximal_chain [finite_dimensional_ring R] : prime_ideal_chain R :=
-finite_dimensional_ring.fin_dim.some
+@[simps]
+def tail (p : strict_chain α) (h : p.len ≠ 0) : strict_chain α :=
+{ len := p.len.pred,
+  func := λ j, p ⟨j + 1, nat.succ_lt_succ begin 
+    have := j.2, 
+    conv_rhs at this { rw [← nat.succ_eq_add_one, nat.succ_pred_eq_of_pos (nat.pos_of_ne_zero h)] },
+    exact this,
+  end⟩,
+  strict_mono' := λ _ _ H, p.strict_mono' (nat.succ_lt_succ H) }
 
-lemma maximal_chain_is_maximal [finite_dimensional_ring R] (M : prime_ideal_chain R) :
-  M.len ≤ (maximal_chain R).len :=
-finite_dimensional_ring.fin_dim.some_spec M
-
-/--
-If `R` is finite dimensional, then its dimension is the length of the longest prime ideal chain.
--/
-lemma krull_dim_eq_len [finite_dimensional_ring R] : krull_dim R = (maximal_chain R).len :=
+lemma tail_zero (p : strict_chain α) (h : p.len ≠ 0) : p.tail h 0 = p 1 :=
 begin 
-  dunfold krull_dim,
-  split_ifs,
-  refl,
+  rw [tail_func],
+  congr' 1,
+  ext1,
+  dsimp,
+  haveI : fact (2 ≤ p.len + 1),
+  { fconstructor, have := nat.pos_of_ne_zero h, linarith, },
+  rw [zero_add, fin.coe_one_eq_of_le],
 end
 
 /--
-If `R` is infinite dimensional, then its dimension, according to our convention, is zero.
+If `a_0 < a_1 < ... < a_n` and `b_0 < b_1 < ... < b_m` are two strict chains such that `a_n < b_0`,
+then there is a chain of length `n + m + 1` given by
+`a_0 < a_1 < ... < a_n < b_0 < b_1 < ... < b_m`.
 -/
-lemma krull_dim_eq_zero (not_finite : ¬ finite_dimensional_ring R) : krull_dim R = 0 :=
+@[simps]
+def append (p q : strict_chain α) (h : p ⟨p.len, lt_add_one _⟩ < q 0) : strict_chain α :=
+{ len := p.len + q.len + 1,
+  func := fin.append p q ∘ fin.congr (p.len + q.len + 1 + 1) ((p.len + 1) + (q.len + 1)) (by abel),
+  strict_mono' := strict_mono.comp begin 
+    refine fin.add_cases (λ i, _) (λ i, _),
+    { refine fin.add_cases (λ j, _) (λ j, _),
+      { intros H, rw [fin.append_left, fin.append_left], exact p.strict_mono' H, },
+      { intros H, 
+        rw [fin.append_left, fin.append_right],
+        have ineq1 : p i ≤ p ⟨p.len, lt_add_one _⟩,
+        { refine p.strict_mono'.monotone _, change i.1 ≤ p.len, linarith [i.2] },
+        have ineq2 : q 0 ≤ q j,
+        { refine q.strict_mono'.monotone _, norm_num },
+        exact lt_of_lt_of_le (lt_of_le_of_lt ineq1 h) ineq2, }, },
+    { refine fin.add_cases (λ j, _) (λ j, _),
+      { intros H, 
+        rw [fin.append_right, fin.append_left],
+        change (p.len + 1) + i.1 < j.1 at H,
+        exfalso,
+        linarith [j.2], },
+      { intros H,
+        rw [fin.append_right, fin.append_right],
+        change fin.val _ < fin.val _ at H,
+        rw [fin.val_eq_coe, fin.coe_nat_add, fin.val_eq_coe, fin.coe_nat_add] at H,
+        refine q.strict_mono' (_ : i.1 < j.1),
+        rw [fin.val_eq_coe, fin.val_eq_coe],
+        linarith, }, },
+  end (order_iso.strict_mono _) }
+
+/--
+For two pre-ordered sets `α, β`, if `f : α → β` is strictly monotonic, then a strict chain of `α` 
+can be pushed out to a strict chain of `β` by 
+`a₀ < a₁ < ... < aₙ ↦ f a₀ < f a₁ < ... < f aₙ`
+-/
+@[simps]
+def map (p : strict_chain α) (f : α → β) (hf : strict_mono f) : strict_chain β :=
+{ len := p.len,
+  func := f.comp p,
+  strict_mono' := hf.comp p.strict_mono' }
+
+/--
+For two pre-ordered sets `α, β`, if `f : α → β` is surjective and strictly monotonic, then a strict 
+chain of `β` can be pulled back to a strict chain of `α` by 
+`b₀ < b₁ < ... < bₙ ↦ f⁻¹ b₀ < f⁻¹ b₁ < ... < f⁻¹ bₙ` where `f⁻¹ bᵢ` is an arbitrary element in the
+preimage of `f⁻¹ {bᵢ}`.
+-/
+@[simps]
+def comap (p : strict_chain β) (f : α → β) (hf1 : strict_comono f) (hf2 : function.surjective f) :
+  strict_chain α :=
+{ len := p.len,
+  func := λ i, (hf2 (p i)).some,
+  strict_mono' := λ i j h, hf1 (by simpa only [(hf2 _).some_spec] using p.strict_mono' h) }
+
+variable (α)
+
+lemma exists_len_gt_of_infinite_dim [no_top_order (strict_chain α)] [nonempty α] (n : ℕ) : 
+  ∃ (p : strict_chain α), n < p.len :=
+begin
+  haveI : inhabited α := classical.inhabited_of_nonempty infer_instance,
+  induction n with n ih,
+  { obtain ⟨p, hp⟩ := no_top_order.exists_not_le (default : strict_chain α),
+    refine ⟨p, lt_of_not_le hp⟩, },
+  { rcases ih with ⟨p, hp⟩,
+    rcases no_top_order.exists_not_le p with ⟨q, hq⟩,
+    dsimp [le_def, not_le, nat.succ_eq_add_one] at *,
+    exact ⟨q, by linarith⟩, },
+end
+
+end strict_chain
+
+/--
+Krull dimension of a pre-ordered set `α` is the supremum of lengths of all strict chains of `α`.
+-/
+@[reducible] def krull_dim : ℕ±∞ := ⨆ (p : strict_chain α), p.len
+
+variables {α}
+
+/--
+Height of an element `a` of a pre-ordered set `α` is the Krull dimension of the subset `(-∞, a]`
+-/
+@[reducible] def height (a : α) : ℕ±∞ := krull_dim (set.Iic a)
+
+/--
+Coheight of an element `a` of a pre-ordered set `α` is the Krull dimension of the subset `[a, +∞)`
+-/
+@[reducible] def coheight (a : α) : ℕ±∞ := krull_dim (set.Ici a)
+
+variable (α)
+
+lemma krull_dim_eq_bot_of_is_empty [is_empty α] : krull_dim α = ⊥ :=
+with_bot.csupr_empty _
+
+lemma krull_dim_eq_top_of_no_top_order [nonempty α] [no_top_order (strict_chain α)] : 
+  krull_dim α = ⊤ :=
+le_antisymm le_top $ le_Sup_iff.mpr $ λ m hm, match m, hm with
+| ⊥, hm := false.elim begin 
+  haveI : inhabited α := classical.inhabited_of_nonempty infer_instance,
+  exact not_le_of_lt (with_bot.bot_lt_coe _ : ⊥ < (0 : ℕ±∞)) 
+    (hm ⟨⟨0, λ _, default, λ _ _ h, ((ne_of_lt h) $ subsingleton.elim _ _).elim⟩, rfl⟩),
+end
+| some ⊤, hm := le_refl _ 
+| some (some m), hm := begin 
+  rw mem_upper_bounds at hm,
+  obtain ⟨p, hp⟩ := strict_chain.exists_len_gt_of_infinite_dim α m,
+  specialize hm p.len ⟨p, rfl⟩,
+  refine (not_lt_of_le hm _).elim,
+  erw [with_bot.some_eq_coe, with_bot.coe_lt_coe, with_top.some_eq_coe, with_top.coe_lt_coe],
+  assumption,
+end
+end
+
+lemma krull_dim_eq_len_of_order_top [order_top (strict_chain α)] :
+  krull_dim α = (⊤ : strict_chain α).len :=
+le_antisymm (supr_le $ λ i, with_bot.coe_le_coe.mpr $ with_top.coe_le_coe.mpr $ 
+    order_top.le_top i) (le_Sup ⟨_, rfl⟩)
+
+lemma krull_dim_eq_len_of_order_top' [order_top (strict_chain α)] 
+  (q : strict_chain α) (h : is_top q) :
+  krull_dim α = q.len :=
+(krull_dim_eq_len_of_order_top α).trans $ strict_chain.top_len_unique α _ h ▸ rfl
+
+variables {α β}
+
+lemma krull_dim_eq_len_of_is_top [order_top (strict_chain α)] (p : strict_chain α) (hp : is_top p) :
+  krull_dim α = p.len :=
+by rw [krull_dim_eq_len_of_order_top, (strict_chain.top_len_unique _ p hp).symm]
+
+lemma no_top_order_of_strict_mono (f : α → β) (hf : strict_mono f) [no_top_order (strict_chain α)]
+  [nonempty α]: (no_top_order (strict_chain β)) :=
+{ exists_not_le := λ smb, let ⟨p, hp⟩ := (strict_chain.exists_len_gt_of_infinite_dim α smb.len) in 
+    ⟨p.map f hf, not_le_of_lt hp⟩ }
+
+lemma krull_dim_le_of_strict_mono (f : α → β) (hf : strict_mono f) : krull_dim α ≤ krull_dim β :=
+supr_le $ λ p, le_Sup ⟨p.map _ hf, rfl⟩
+
+lemma height_mono {a b : α} (h : a ≤ b) : height a ≤ height b :=
+krull_dim_le_of_strict_mono (λ x, ⟨x, le_trans x.2 h⟩) $ λ _ _ h, h
+
+lemma height_le_krull_dim (a : α) : height a ≤ krull_dim α :=
+krull_dim_le_of_strict_mono coe $ subtype.strict_mono_coe _
+
+lemma coheight_antitone {a b : α} (h : a ≤ b) : coheight b ≤ coheight a :=
+supr_le $ λ p, le_Sup ⟨⟨p.len, (λ (x : set.Ici b), ⟨x, le_trans h x.2⟩) ∘ p, strict_mono.comp 
+  (λ i j h, h) p.strict_mono'⟩, rfl⟩
+
+lemma coheight_le_krull_dim (a : α) : coheight a ≤ krull_dim α :=
+krull_dim_le_of_strict_mono coe $ subtype.strict_mono_coe _
+
+lemma krull_dim_le_of_strict_comono_and_surj 
+  (f : α → β) (hf : strict_comono f) (hf' : function.surjective f) : krull_dim β ≤ krull_dim α :=
+supr_le $ λ p, le_Sup ⟨p.comap _ hf hf', rfl⟩
+
+lemma krull_dim_eq_of_order_iso (f : α ≃o β) : krull_dim α = krull_dim β :=
+le_antisymm (krull_dim_le_of_strict_mono f f.strict_mono) (krull_dim_le_of_strict_comono_and_surj f 
+  (λ _ _ h, by convert f.symm.strict_mono h; rw f.symm_apply_apply) f.surjective)
+
+lemma exists_of_nat_lt_krull_dim (n : ℕ) (h : ↑n < krull_dim α) : 
+  ∃ (p : strict_chain α), n < p.len :=
 begin 
-  dunfold krull_dim,
-  split_ifs,
-  refl,
+  contrapose! h,
+  refine supr_le (λ p, _),
+  erw [with_bot.coe_le_coe, with_top.coe_le_coe],
+  exact h p,
 end
 
-section
-
-variables {R}
-
-/--
-Pulling back a chain of prime ideal chain of `S` along a surjective ring homomorphism `f : R ⟶ S`
-to obtain a prime idael chain of `R` by `𝔭ᵢ ↦ f⁻¹ 𝔭ᵢ`.
--/
-@[simps] def prime_ideal_chain.comap {S : Type*} [comm_ring S] (N : prime_ideal_chain S)
-  (f : R →+* S) (hf : function.surjective f) : prime_ideal_chain R :=
-{ len := N.len,
-    chain := λ j, (N.chain j).comap f,
-    is_chain := λ i j h, begin 
-      dsimp,
-      rw lt_iff_le_and_ne,
-      split,
-      { refine ideal.comap_mono _,
-        refine le_of_lt (N.is_chain h), },
-      { have neq := ne_of_lt (N.is_chain h),
-        contrapose! neq,
-        ext1 s,
-        obtain ⟨r, rfl⟩:= hf s,
-        rw [← ideal.mem_comap, neq, ideal.mem_comap], },
-    end,
-    is_prime := λ j, begin
-      haveI := N.is_prime j,
-      refine ideal.comap_is_prime _ _,
-    end }
-
-
-/--
-If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, then every prime ideal
-chain of `S` has length at most `krull_dim R` 
--/
-theorem prime_ideal_chain.length_bounded {S : Type*} [comm_ring S]
-  (N : prime_ideal_chain S) [finite_dimensional_ring R]
-  (f : R →+* S) (hf : function.surjective f) : 
-  N.len ≤ krull_dim R :=
-begin
-  rw [show N.len = (N.comap f hf).len, from rfl, krull_dim_eq_len],
-  apply maximal_chain_is_maximal,
+lemma exists_of_nat_le_krull_dim (n : ℕ) (h : ↑n ≤ krull_dim α) : 
+  ∃ (p : strict_chain α), n ≤ p.len :=
+begin 
+  contrapose! h,
+  by_cases H : is_empty α,
+  { resetI, rw krull_dim_eq_bot_of_is_empty, rw with_bot.bot_lt_iff_ne_bot, norm_num, },
+  rw not_is_empty_iff at H,
+  haveI : inhabited α := classical.inhabited_of_nonempty H,
+  have hn : 0 < n,
+  { specialize h default, linarith },
+  have hn' : n ≠ 0 := by linarith, 
+  simp_rw nat.lt_iff_le_pred hn at h,
+  refine supr_lt_iff.mpr ⟨↑(n - 1), _, λ p, _⟩,
+  { erw [with_bot.coe_lt_coe, with_top.coe_lt_coe],
+    exact nat.pred_lt hn', },
+  erw [with_bot.coe_le_coe, with_top.coe_le_coe],
+  exact h _,
 end
 
-end
+variable (α)
+
+lemma krull_dim_eq_supr_height : krull_dim α = ⨆ (a : α), height a :=
+le_antisymm (supr_le $ λ i, le_supr_of_le (i ⟨i.len, lt_add_one _⟩) $ le_Sup 
+  ⟨⟨_, λ m, ⟨i m, i.strict_mono'.monotone begin 
+    rw [show m = ⟨m.1, m.2⟩, by cases m; refl, fin.mk_le_mk],
+    linarith [m.2],
+  end⟩, i.strict_mono'⟩, rfl⟩) $ 
+supr_le $ λ a, krull_dim_le_of_strict_mono subtype.val $ λ _ _ h, h
+
+lemma krull_dim_le_order_dual : krull_dim α ≤ krull_dim αᵒᵈ :=
+supr_le $ λ i, le_Sup $ ⟨i.reverse, rfl⟩
+
+lemma krull_dim_order_dual_le : krull_dim αᵒᵈ ≤ krull_dim α :=
+(krull_dim_le_order_dual _).trans $ krull_dim_le_of_strict_mono 
+  (order_dual.of_dual ∘ order_dual.of_dual) $ λ _ _ h, h 
+
+lemma krull_dim_eq_order_dual : krull_dim α = krull_dim αᵒᵈ :=
+le_antisymm (krull_dim_le_order_dual _) $ krull_dim_order_dual_le _
+
+lemma krull_dim_nonneg [nonempty α] : 0 ≤ krull_dim α :=
+le_Sup ⟨⟨_, λ _, nonempty.some infer_instance, λ _ _ h, (ne_of_lt h $ subsingleton.elim _ _).elim⟩, 
+  rfl⟩ 
+
+end preorder
+
+section partial_order
+
+section height_and_coheight
+
+variables [partial_order α] {α}
+
+lemma height_eq (a : α) : 
+  height a = ⨆ (p : strict_chain α) (hp : p ⟨p.len, lt_add_one _⟩ = a), p.len := 
+le_antisymm (supr_le $ λ p, le_supr_iff.mpr $ λ m h, begin 
+  by_cases hp : p ⟨p.len, lt_add_one _⟩ = ⟨a, le_refl _⟩,
+  { specialize h ⟨p.len, λ i, p i, λ _ _ h, p.strict_mono' h⟩,
+    rwa [supr_pos] at h,
+    rwa subtype.ext_iff at hp, },
+  { have hp' : p ⟨p.len, lt_add_one _⟩ < ⟨a, le_refl _⟩,
+    { exact lt_of_le_of_ne ((p _).2) hp, },
+    let q := p.snoc ⟨a, le_refl _⟩ hp',
+    specialize h ⟨q.len, λ i, q i, λ _ _ h, q.strict_mono' h⟩,
+    rw [supr_pos] at h,
+    work_on_goal 2 { exact subtype.ext_iff_val.mp (p.snoc_last ⟨a, le_refl _⟩ hp'), },
+    refine le_trans _ h,
+    dsimp,
+    erw [with_bot.coe_le_coe],
+    norm_cast,
+    linarith, },
+end) $ supr_le $ λ p, supr_le $ λ hp, le_Sup ⟨⟨_, λ i, ⟨p i, hp ▸ p.strict_mono'.monotone begin 
+  change i.1 ≤ p.len,
+  linarith [i.2]
+end⟩, λ _ _ h, p.strict_mono' h⟩, rfl⟩
+
+lemma height_eq_zero_of_is_bot (a : α) (h : is_bot a) : height a = 0 :=
+le_antisymm (supr_le $ λ p, begin 
+  erw [with_bot.coe_le_coe, with_top.coe_le_coe],
+  by_contra' r,
+  set q : strict_chain α := ⟨p.len, λ i, p i, λ _ _ h, p.strict_mono' h⟩,
+  by_cases H : q ⟨p.len, lt_add_one _⟩ = a,
+  { have ineq1 : q 0 < q ⟨p.len, lt_add_one _⟩ := q.strict_mono' r,
+    rw [H, lt_iff_le_not_le] at ineq1,
+    exact ineq1.2 (h _), },
+  { have H' : q ⟨p.len, lt_add_one _⟩ < a := lt_of_le_of_ne (p _).2 H,
+    set q' : strict_chain α := q.snoc _ H' with q'_eq,
+    have ineq1 : q' ⟨p.len, (lt_add_one _).trans (lt_add_one _)⟩ < q' ⟨p.len + 1, lt_add_one _⟩ := 
+      q'.strict_mono' (lt_add_one _),
+    rw [show q' ⟨p.len + 1, lt_add_one _⟩ = a, from q.snoc_last _ _, lt_iff_le_not_le] at ineq1,
+    exact ineq1.2 (h _), },
+end) $ le_supr_iff.mpr $ λ m hm, hm ⟨0, λ _, ⟨a, le_refl _⟩, λ _ _ h, (not_le.mpr h $ le_of_eq $ 
+  subsingleton.elim _ _).elim⟩
+
+lemma coheight_eq (a : α) :
+  coheight a = ⨆ (p : strict_chain α) (hp : p 0 = a), p.len :=
+le_antisymm (supr_le $ λ p, le_supr_iff.mpr $ λ m h, begin 
+  by_cases hp : p 0 = ⟨a, le_refl _⟩,
+  { specialize h ⟨p.len, λ i, p i, λ _ _ h, p.strict_mono' h⟩,
+    rwa [supr_pos] at h,
+    rwa subtype.ext_iff at hp, },
+  { have hp' : (⟨a, le_refl _⟩ : set.Ici a) < p 0,
+    { exact lt_of_le_of_ne (p _).2 (ne.symm hp), },
+    let q := p.cons ⟨a, le_refl _⟩ hp',
+    specialize h ⟨q.len, λ i, q i, λ _ _ h, q.strict_mono' h⟩,
+    rw [supr_pos] at h,
+    work_on_goal 2 { exact subtype.ext_iff_val.mp (p.cons_zero ⟨a, le_refl _⟩ hp'), },
+    refine le_trans _ h,
+    dsimp,
+    erw [with_bot.coe_le_coe],
+    norm_cast,
+    linarith },
+end) $ supr_le $ λ p, supr_le $ λ hp, le_Sup ⟨⟨_, λ i, ⟨p i, hp ▸ p.strict_mono'.monotone begin 
+  change 0 ≤ i.1,
+  norm_num,
+end⟩, λ _ _ h, p.strict_mono' h⟩, rfl⟩
+
+lemma coheight_eq_zero_of_is_top (a : α) (h : is_top a) : coheight a = 0 :=
+le_antisymm (supr_le $ λ p, begin 
+  erw [with_bot.coe_le_coe, with_top.coe_le_coe],
+  by_contra' r,
+  set q : strict_chain α := ⟨p.len, λ i, p i, λ _ _ h, p.strict_mono' h⟩,
+  by_cases H : q 0 = a,
+  { have ineq1 : q 0 < q ⟨p.len, lt_add_one _⟩ := q.strict_mono' r,
+    rw [H, lt_iff_le_not_le] at ineq1,
+    exact ineq1.2 (h _), },
+  { have H' : a < q 0 := lt_of_le_of_ne (p _).2 (ne.symm H),
+    set q' : strict_chain α := q.cons _ H' with q'_eq,
+    have ineq1 : q' 0 < q' 1 := q'.strict_mono' (_ : 0 < 1),
+    work_on_goal 2 { 
+      change 0 < fin.val _,
+      haveI : fact (2 ≤ q'.len + 1),
+      { fconstructor, rw show q'.len = p.len + 1, from rfl, linarith, },
+      rw fin.one_val_eq_of_le,
+      exact nat.zero_lt_one, },
+    rw [show q' 0 = a, from q.cons_zero _ _, lt_iff_le_not_le] at ineq1,
+    exact ineq1.2 (h _), },
+end) $ le_supr_iff.mpr $ λ m hm, hm ⟨0, λ _, ⟨a, le_refl _⟩, λ _ _ h, (not_le.mpr h $ le_of_eq $ 
+  subsingleton.elim _ _).elim⟩
 
 /--
-If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, then `S` is finite
-dimensional as well.
+Matsumura p.30
 -/
-lemma finite_dimensional_of_surj [finite_dimensional_ring R] 
-  (S : Type*) [comm_ring S] [nontrivial S]
-  (f : R →+* S) (hf : function.surjective f) : finite_dimensional_ring S :=
-begin
-  rw finite_dimensional_ring.iff_len_bounded,
-  exact ⟨krull_dim R, λ N, N.length_bounded f hf ⟩,
-end
+lemma height_add_coheight_le (a : α) : height a + coheight a ≤ krull_dim α :=
+suffices ∀ (r s : ℕ±∞), r ≤ height a → s ≤ coheight a → r + s ≤ krull_dim α, 
+from this _ _ (le_refl _) (le_refl _), 
+suffices ∀ (r s : ℕ), ↑r ≤ height a → ↑s ≤ coheight a → ↑(r + s) ≤ krull_dim α,
+from λ r s hr hs, begin 
+  induction r using eenat.rec;
+  induction s using eenat.rec;
+  exact bot_le <|> exact hr.trans (height_le_krull_dim _) <|> 
+    exact hs.trans (coheight_le_krull_dim _) <|> exact this r s hr hs,
+end, λ r s hr hs, begin 
+  obtain ⟨p, hp⟩ := exists_of_nat_le_krull_dim _ hr,
+  obtain ⟨q, hq⟩ := exists_of_nat_le_krull_dim _ hs,
+  let p' : strict_chain α := ⟨p.len, λ i, p i, λ _ _ h, p.strict_mono' h⟩,
+  let q' : strict_chain α := ⟨q.len, λ i, q i, λ _ _ h, q.strict_mono' h⟩,
+  by_cases hq' : q'.len = 0,
+  { have eq1 : q.len = 0 := hq',
+    have eq2 : s = 0 := by linarith,
+    rw [eq2, add_zero],
+    exact hr.trans (height_le_krull_dim _) },
+  haveI : fact (2 ≤ q.len + 1),
+  { fconstructor, rw show q.len = q'.len, from rfl, linarith [nat.pos_of_ne_zero hq'], },
+  let c := p'.append (q'.tail hq') begin 
+    rw [strict_chain.tail_zero],
+    exact lt_of_le_of_lt (le_trans (p _).2 (q _).2) (q'.strict_mono' (fin.one_pos_of_le _)),
+  end,
+  refine le_trans _ (le_supr _ c),
+  erw [with_bot.coe_le_coe, with_top.coe_le_coe],
+  rw [show c.len = p'.len + (q'.len.pred) + 1, from rfl, add_assoc, ←nat.succ_eq_add_one, 
+    nat.succ_pred_eq_of_pos (nat.pos_of_ne_zero hq')],
+  exact add_le_add hp hq,
+end     
 
-/--
-If `R` is finite dimensional and `R ⟶ S` is a surjective ring homomorphism, 
-then `krull_dim S ≤ krull_dim R`.
--/
-theorem krull_dim_le_of_surj [finite_dimensional_ring R]
-  (S : Type*) [comm_ring S] [nontrivial S]
-  (f : R →+* S) (hf : function.surjective f) : krull_dim S ≤ krull_dim R :=
-begin
-  haveI : finite_dimensional_ring S := finite_dimensional_of_surj R S f hf,
-  rw krull_dim_eq_len,
-  exact (maximal_chain S).length_bounded f hf,
-end
+end height_and_coheight
 
-/--
-If `R` is finite dimensional and nontrivial and `S` is isomorphic
-to `R`, then `krull_dim R = krull_dim S`.
--/
-theorem krull_dim_eq_of_findim_nontriv_isom
-  [finite_dimensional_ring R] [nontrivial R]
-  (S : Type*) [comm_ring S] (e : R ≃+* S) :
-  krull_dim R = krull_dim S :=
-begin
-  haveI : nontrivial S,
-    exact function.injective.nontrivial
-    (equiv_like.injective e),
-  haveI : finite_dimensional_ring S,
-    exact finite_dimensional_of_surj R S e
-    (equiv_like.surjective e),
-  have hRS : krull_dim R ≤ krull_dim S,
-    exact krull_dim_le_of_surj S R (ring_equiv.symm e)
-    (equiv_like.surjective (ring_equiv.symm e)),
-  have hSR : krull_dim S ≤ krull_dim R,
-    exact krull_dim_le_of_surj R S e
-    (equiv_like.surjective e),
-  exact le_antisymm hRS hSR,
-end
-
-/--
-If `R` is nontrivial and `S` is isomorphic to `R`, then `krull_dim R = krull_dim S`.
--/
-theorem krull_dim_eq_of_nontriv_isom [nontrivial R]
-  (S : Type*) [comm_ring S] (e : R ≃+* S) :
-  krull_dim R = krull_dim S :=
-begin
-  by_cases hf : finite_dimensional_ring R,
-  haveI : finite_dimensional_ring R,
-    exact hf,
-  exact krull_dim_eq_of_findim_nontriv_isom R S e,
-  have hi : ¬finite_dimensional_ring S,
-    contrapose hf,
-    rw not_not at hf ⊢,
-    haveI : finite_dimensional_ring S,
-      exact hf,
-    exact finite_dimensional_of_surj S R (ring_equiv.symm e)
-    (equiv_like.surjective (ring_equiv.symm e)),
-  have h1 : krull_dim R = 0,
-    exact krull_dim_eq_zero R hf,
-  have h2 : krull_dim S = 0,
-    exact krull_dim_eq_zero S hi,
-  rw h1,
-  rw h2,
-end
-
-/--
-If `R` is trivial, then according to our definition, `R` is not finite dimensional.
--/
-lemma not_fin_dim_of_triv [ht : ¬nontrivial R] :
-  ¬finite_dimensional_ring R :=
-begin
-  by_contra hf,
-    have hI : ∃ (I : ideal R), I.is_prime,
-      use hf.fin_dim.some.chain 0,
-      exact hf.fin_dim.some.is_prime 0,
-    cases hI with I hI',
-    have haz : ∀ (x : R), x = 0,
-      intro x,
-      by_contra,
-      have htR : ¬(∃ (x y : R), x ≠ y),
-        rw ←nontrivial_iff,
-        exact ht,
-      have nhtR : ∃ (x y : R), x ≠ y,
-        use x,
-        use 0,
-      exact htR nhtR,
-    have hIeqT : I = ⊤,
-      ext x,
-      split,
-      intro,
-      triv,
-      rw (haz x),
-      intro,
-      exact ideal.zero_mem I,
-    exact ideal.is_prime.ne_top hI' hIeqT,
-end
-
-/--
-If `R` and `S` are isomorphic, then `krull_dim R = krull_dim S`.
--/
-theorem krull_dim_eq_of_isom (S : Type*) [comm_ring S]
-  (e : R ≃+* S) : krull_dim R = krull_dim S :=
-begin
-  by_cases hnt : nontrivial R,
-  haveI : nontrivial R := hnt,
-  exact krull_dim_eq_of_nontriv_isom R S e,
-  have htS : ¬nontrivial S,
-    intro hntS,
-    have hntR : nontrivial R,
-      rw nontrivial_iff at hntS ⊢,
-      cases hntS with x h,
-      cases h with y h',
-      use ring_equiv.symm e x,
-      use ring_equiv.symm e y,
-      intro hxeye,
-      exact h' ((ring_equiv.injective (ring_equiv.symm e))
-      hxeye),
-    exact hnt hntR,
-  have hnfR : ¬finite_dimensional_ring R,
-    exact (@not_fin_dim_of_triv R _ hnt),
-  have hnfS : ¬finite_dimensional_ring S,
-    exact (@not_fin_dim_of_triv S _ htS),
-  have h1 : krull_dim R = 0,
-    exact krull_dim_eq_zero R hnfR,
-  have h2 : krull_dim S = 0,
-    exact krull_dim_eq_zero S hnfS,
-  rw h1,
-  rw h2,
-end
-
-/--
-If `R` is finite dimensional, `I` is an ideal of `R`, and `R ⧸ I` is
-nontrivial, then `krull_dim (R ⧸ I) ≤ krull_dim R`.
--/
-theorem krull_dim_le_of_quot [finite_dimensional_ring R] (I : ideal R) [nontrivial (R ⧸ I)] : 
-  krull_dim (R ⧸ I) ≤ krull_dim R :=
-begin
-  haveI : finite_dimensional_ring (R ⧸ I) := 
-    finite_dimensional_of_surj R (R ⧸ I) (ideal.quotient.mk I) ideal.quotient.mk_surjective,
-  exact krull_dim_le_of_surj _ _ (ideal.quotient.mk I) ideal.quotient.mk_surjective,
-end
-
-
-section height
-
-variables {R} 
-
-/--
-The height of a prime ideal `𝔭` is defined to be `krull_dim R_𝔭`
--/
-def ideal.height (p : ideal R) [p.is_prime] : ℕ :=
-krull_dim (localization.at_prime p)
-
-example (p : ideal R) [p.is_prime] : ℕ := p.height
-
-end height
+end partial_order
