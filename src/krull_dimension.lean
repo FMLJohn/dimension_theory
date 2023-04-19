@@ -62,6 +62,54 @@ namespace strict_chain
 instance : has_coe_to_fun (strict_chain α) (λ x, fin (x.len + 1) → α) :=
 { coe := λ x, x.func }
 
+section refinements
+
+variables {α β}
+
+@[ext]
+structure refinement (p q : strict_chain α) :=
+(func : fin (p.len + 1) → fin (q.len + 1))
+(strict_mono' : strict_mono func)
+(comp' : q ∘ func = p)
+
+def is_refinement (p q : strict_chain α) : Prop := nonempty (p.refinement q)
+
+namespace refinement
+
+instance (p q : strict_chain α) : 
+  has_coe_to_fun (p.refinement q) (λ _, fin (p.len + 1) → fin (q.len + 1)) :=
+{ coe := refinement.func }
+
+lemma comp_eq {p q : strict_chain α} (x : p.refinement q) : q ∘ x = p := x.comp'
+
+@[simps]
+def refl (p : strict_chain α) : p.refinement p :=
+{ func := id,
+  strict_mono' := strict_mono_id,
+  comp' := function.comp.right_id _ }
+
+@[simps]
+def trans {a b c : strict_chain α} (x : a.refinement b) (y : b.refinement c) :
+  a.refinement c :=
+{ func := y ∘ x,
+  strict_mono' := y.strict_mono'.comp x.strict_mono',
+  comp' := by rw [← x.comp_eq, ← y.comp_eq, function.comp.assoc] }
+
+end refinement
+
+namespace is_refinement
+
+@[refl] lemma refl (p : strict_chain α) : p.is_refinement p :=
+⟨refinement.refl p⟩
+
+@[trans] lemma trans {a b c : strict_chain α} 
+  (h : a.is_refinement b) (h' : b.is_refinement c) : a.is_refinement c :=
+h.elim $ h'.elim $ λ x y, ⟨y.trans x⟩
+
+end is_refinement
+
+end refinements
+
 /--
 The induced ordering on `strict_chain α` is by comparing length of strict chains.
 -/
