@@ -2,6 +2,7 @@ import order.monotone.basic
 import order.with_bot
 import data.fin.basic
 import tactic.linarith
+import algebra.module.localized_module
 import algebraic_geometry.prime_spectrum.basic
 import ring_theory.ideal.basic
 
@@ -278,6 +279,44 @@ instance (F : Type*) [field F] : order_top (strict_chain (prime_spectrum F)) :=
 
 lemma eq_zero_of_field (F : Type*) [field F] : ring_krull_dim F = 0 :=
 krull_dim_eq_len_of_order_top (prime_spectrum F)
+
+/--
+Suppose `I` is in the prime spectrum of `R` and `J` is an ideal of `R`. The ideal spanned by the
+image of `J` in `localization.at_prime I.as_ideal` with respect to the algebra map.
+-/
+def ideal_image_span (R : Type*) [comm_ring R] (I : prime_spectrum R) (J : ideal R) :=
+  J.map (algebra_map R (localization.at_prime I.as_ideal))
+
+def map_from_localized_module_to_ideal_image_span (R : Type*) [comm_ring R] (I : prime_spectrum R)
+  (J : ideal R) : (localized_module I.as_ideal.prime_compl J) →
+  J.map (algebra_map R (localization.at_prime I.as_ideal)) :=
+begin
+  intro x,
+  fconstructor,
+  apply localization.mk,
+end
+
+
+
+/--
+lemma ideal_image_span_eq_localized_module (R : Type*) [comm_ring R]
+  (I : prime_spectrum R) (J : ideal R) : ideal_image_span R I J =
+  localized_module I.as_ideal.prime_compl J :=
+-/
+
+def localization_prime_spectrum_map (R : Type*) [comm_ring R] (I : prime_spectrum R) :
+  (set.Iic I) → prime_spectrum (localization.at_prime I.as_ideal) :=
+  λ I', ⟨I'.1.as_ideal.map (algebra_map R (localization.at_prime I.as_ideal)),
+    begin
+      fconstructor,
+      /- { intro hit,
+        have hi : I' = ⊤,
+          by_contra hni,
+          haveI : nonempty (ideal.prime_compl I.as_ideal),
+            refine has_one.nonempty,
+      } -/
+      sorry
+    end⟩
 
 /--
 Suppose `I` is a prime ideal of `R`, then there is a canonical map from
