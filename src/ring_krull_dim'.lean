@@ -235,7 +235,7 @@ begin
       localization.mk_eq_mk_iff, localization.r_iff_exists],
     use 1,
     simp, },
-end
+end 
 
 @[simps]
 def ideal_image_span' : ideal (localization.at_prime I.as_ideal) :=
@@ -266,19 +266,94 @@ def ideal_image_span' : ideal (localization.at_prime I.as_ideal) :=
         refl, },
     end }
 
-def localization_prime_spectrum_map :
-  (set.Iic I) → prime_spectrum (localization.at_prime I.as_ideal) :=
-  λ I', ⟨ideal_image_span' I I'.1.as_ideal,
-    begin
-      fconstructor,
-      { intro hit,
-        sorry },
-      sorry
-    end⟩
+@[simp]
+lemma mem_ideal_image_span'_iff (x : localization.at_prime I.as_ideal) :
+  x ∈ ideal_image_span' I J ↔ ∃ (a : J) (b : I.as_ideal.prime_compl), x = localization.mk a b := 
+    iff.rfl
+
+@[simp]
+lemma mem_ideal_image_span'_of_mem_ideal_image_span : ∀ (x : localization.at_prime I.as_ideal),
+  x ∈ ideal_image_span I J → x ∈ ideal_image_span' I J :=
+begin
+  intros a ha,
+  refine submodule.span_induction' _ _ _ _ ha,
+  { intros x hx,
+    rcases hx with ⟨y, ⟨hy1, hy2⟩⟩,
+    change localization.mk y 1 = x at hy2,
+    rw [←hy2, mem_ideal_image_span'_iff],
+    use ⟨y, hy1⟩, use 1, refl, },
+  { exact (ideal_image_span' I J).zero_mem, },
+  { intros _ _ _ _ h1 h2, exact ideal.add_mem (ideal_image_span' I J) h1 h2, },
+  { intros a b _ h1, exact submodule.smul_mem (ideal_image_span' I J) a h1, },
+end
+
+lemma ideal_image_span'_eq_ideal_image_span :
+  ideal_image_span' I J = ideal_image_span I J :=
+begin
+  ext1 x,
+  split,
+  { rw mem_ideal_image_span'_iff,
+    rintros ⟨⟨a, ha⟩, ⟨b, hb⟩⟩,
+    change x = localization.mk a b at hb,
+    rw [←one_mul a, ←mul_one b, ←localization.mk_mul] at hb,
+    rw hb,
+    exact ideal.mul_mem_left (ideal_image_span I J) (localization.mk 1 b)
+      (ideal.mem_map_of_mem (algebra_map R (localization.at_prime I.as_ideal)) ha), },
+  { apply mem_ideal_image_span'_of_mem_ideal_image_span, },
+end
+
+instance ideal_image_span'_is_prime (J : set.Iic I) :
+  (ideal_image_span' I J.1.as_ideal).is_prime :=
+{ ne_top' := begin
+      intro hit,
+      rw [ideal.eq_top_iff_one, ←localization.mk_one, mem_ideal_image_span'_iff] at hit,
+      rcases hit with ⟨a, ⟨b, hb⟩⟩,
+      have his : is_unit (@is_localization.mk' R _ (I.as_ideal.prime_compl)
+        (localization.at_prime I.as_ideal) _ _ _ a b), begin
+          simp only [localization.mk_eq_mk'] at hb,
+          rw [←hb, is_localization.mk'_one],
+          norm_num,
+        end,
+      rw is_localization.at_prime.is_unit_mk'_iff at his,
+      exact his (J.2 a.2),
+    end,
+  mem_or_mem' := begin
+      refine localization.ind _, rintros ⟨a1, a2⟩,
+      refine localization.ind _, rintros ⟨b1, b2⟩,
+      change (localization.mk a1 a2) * (localization.mk b1 b2)
+        ∈ ideal_image_span' I J.val.as_ideal →
+          localization.mk a1 a2 ∈ ideal_image_span' I J.val.as_ideal
+            ∨ localization.mk b1 b2 ∈ ideal_image_span' I J.val.as_ideal,
+      rw [localization.mk_mul, mem_ideal_image_span'_iff],
+      rintros ⟨p, ⟨q, h⟩⟩,
+      rw [localization.mk_eq_mk_iff, localization.r_iff_exists] at h,
+      simp only [submonoid.coe_mul] at h, cases h with c hc,
+      rw [←mul_assoc ↑c (↑a2 * ↑b2) ↑p] at hc,
+      have h1 : ↑c * (↑q * (a1 * b1)) ∈ J.val.as_ideal := by { rw hc,
+        exact ideal.mul_mem_left J.val.as_ideal (↑c * (↑a2 * ↑b2)) p.2, },
+      rw ←mul_assoc ↑c ↑q (a1 * b1) at h1,
+      have h2 : ↑c * ↑q ∉ J.val.as_ideal := by { intro h2',
+        exact (submonoid.mul_mem I.as_ideal.prime_compl c.2 q.2) (J.2 h2'), },
+      have h3 : a1 ∈ J.val.as_ideal ∨ b1 ∈ J.val.as_ideal := by
+        { refine ideal.is_prime.mem_or_mem J.val.is_prime _,
+          have h3' : ↑c * ↑q ∈ J.val.as_ideal ∨ a1 * b1 ∈ J.val.as_ideal,
+            exact ideal.is_prime.mem_or_mem J.val.is_prime h1,
+          rw or_iff_not_imp_left at h3',
+          exact h3' h2, },
+      cases h3 with h3l h3r,
+      left, rw mem_ideal_image_span'_iff, use ⟨a1, h3l⟩, use a2, refl,
+      right, rw mem_ideal_image_span'_iff, use ⟨b1, h3r⟩, use b2, refl,
+    end }
 
 /--
-Suppose `I` is a prime ideal of `R`, then there is a canonical map from
-`prime_spectrum (localization.at_prime I.as_ideal)` to `set.Iic I`.
+There is a canonical map from `set.Iic I` to `prime_spectrum (localization.at_prime I.as_ideal)`.
+-/
+def localization_prime_spectrum_map :
+  (set.Iic I) → prime_spectrum (localization.at_prime I.as_ideal) :=
+  λ I', ⟨ideal_image_span' I I'.1.as_ideal, infer_instance⟩
+
+/--
+There is a canonical map from `prime_spectrum (localization.at_prime I.as_ideal)` to `set.Iic I`.
 -/
 def localization_prime_spectrum_comap (R : Type*) [comm_ring R] (I : prime_spectrum R) :
   prime_spectrum (localization.at_prime I.as_ideal) → (set.Iic I) :=
