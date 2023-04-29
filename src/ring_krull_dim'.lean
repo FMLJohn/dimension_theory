@@ -1,5 +1,6 @@
 import algebraic_geometry.prime_spectrum.basic
 import algebra.module.localized_module
+import krull_dimension'
 
 noncomputable theory
 
@@ -149,6 +150,7 @@ instance ideal_image_span'_is_prime (J : set.Iic I) :
 /--
 There is a canonical map from `set.Iic I` to `prime_spectrum (localization.at_prime I.as_ideal)`.
 -/
+@[simp]
 def localization_prime_spectrum_map : 
   set.Iic I → prime_spectrum (localization.at_prime I.as_ideal) :=
   λ I', ⟨ideal_image_span' I I'.1.as_ideal, infer_instance⟩
@@ -156,6 +158,7 @@ def localization_prime_spectrum_map :
 /--
 There is a canonical map from `prime_spectrum (localization.at_prime I.as_ideal)` to `set.Iic I`.
 -/
+@[simp]
 def localization_prime_spectrum_comap : 
   prime_spectrum (localization.at_prime I.as_ideal) → set.Iic I :=
   λ J, ⟨⟨_, ideal.is_prime.comap (algebra_map R (localization.at_prime I.as_ideal))⟩, λ z hz, 
@@ -167,3 +170,185 @@ def localization_prime_spectrum_comap :
             (⟨z, hnz⟩ : I.as_ideal.prime_compl)],
       exact ideal.mul_mem_right _ _ hz,
     end⟩
+
+/--
+The canonical map from `prime_spectrum (localization.at_prime I.as_ideal)` to `set.Iic I` is a left
+inverse to the canonical map from `set.Iic I` to `prime_spectrum (localization.at_prime I.as_ideal)`.
+-/
+lemma localization_prime_spectrum_comap_is_left_inverse : function.left_inverse
+  (localization_prime_spectrum_comap I) (localization_prime_spectrum_map I) :=
+begin
+  intro J, ext x, split,
+  { intro hx,
+    simp only [localization_prime_spectrum_comap, localization_prime_spectrum_map,
+      subtype.val_eq_coe, subtype.coe_mk, ideal.mem_comap] at hx,
+    change localization.mk x 1 ∈ ideal_image_span' I J.val.as_ideal at hx,
+    rw mem_ideal_image_span'_iff at hx,
+    rcases hx with ⟨a, ⟨b, hab⟩⟩,
+    rw [localization.mk_eq_mk_iff, localization.r_iff_exists] at hab,
+    simp only [submonoid.coe_one, one_mul] at hab,
+    rcases hab with ⟨c, hc⟩,
+    rw ←mul_assoc at hc,
+    refine (or_iff_not_imp_left.1 (ideal.is_prime.mem_or_mem J.val.2 (@set.mem_of_eq_of_mem R
+      (↑c * ↑b * x) (↑c * ↑a) J.val.as_ideal hc (ideal.mul_mem_left J.val.as_ideal ↑c a.2)))) _,
+    intro hi,
+    exact (submonoid.mul_mem I.as_ideal.prime_compl c.2 b.2) (J.2 hi), },
+  { intro hx,
+    simp only [localization_prime_spectrum_comap, localization_prime_spectrum_map,
+      subtype.val_eq_coe, subtype.coe_mk, ideal.mem_comap],
+    change localization.mk x 1 ∈ ideal_image_span' I J.val.as_ideal,
+    rw mem_ideal_image_span'_iff,
+    use ⟨x, hx⟩, use 1,
+    refl, },
+end
+
+/--
+The canonical map from `prime_spectrum (localization.at_prime I.as_ideal)` to `set.Iic I` is a right
+inverse to the canonical map from `set.Iic I` to `prime_spectrum (localization.at_prime I.as_ideal)`.
+-/
+lemma localization_prime_spectrum_comap_is_right_inverse : function.right_inverse
+  (localization_prime_spectrum_comap I) (localization_prime_spectrum_map I) :=
+begin
+  intro J, ext x, split,
+  { intro hx,
+    simp only [localization_prime_spectrum_comap, localization_prime_spectrum_map,
+      subtype.val_eq_coe, subtype.coe_mk, ideal.mem_comap] at hx,
+    rw mem_ideal_image_span'_iff at hx,
+    rcases hx with ⟨a, ⟨b, hab⟩⟩,
+    rcases a with ⟨a, ha⟩,
+    dsimp at ha,
+    change localization.mk a 1 ∈ J.as_ideal at ha,
+    dsimp at hab,
+    rw [←one_mul a, ←mul_one b, ←localization.mk_mul] at hab,
+    rw hab,
+    exact ideal.mul_mem_left J.as_ideal (localization.mk 1 b) ha, },
+  { refine localization.induction_on x _,
+    rintros ⟨a, b⟩ hab,
+    simp only [localization_prime_spectrum_comap, localization_prime_spectrum_map,
+      subtype.val_eq_coe, subtype.coe_mk, ideal.mem_comap] at *,
+    rw mem_ideal_image_span'_iff,
+    use a, dsimp,
+    { change localization.mk a 1 ∈ J.as_ideal,
+      have hab' : (localization.mk (b : R) 1) * (localization.mk a b) = localization.mk a 1 :=
+        by { rw [localization.mk_mul, mul_comm, ←localization.mk_mul, localization.mk_self,
+          mul_one], },
+      rw ←hab',
+      exact ideal.mul_mem_left J.as_ideal (localization.mk b 1) hab, },
+    { use b, refl, }, },
+end
+
+/--
+The canonical map from `set.Iic I` to `prime_spectrum (localization.at_prime I.as_ideal)`
+is bijective.
+-/
+lemma localization_prime_spectrum_map_is_bijective :
+  function.bijective (localization_prime_spectrum_map I) :=
+begin
+  rw function.bijective_iff_has_inverse,
+  use (localization_prime_spectrum_comap I),
+  exact ⟨localization_prime_spectrum_comap_is_left_inverse I,
+    localization_prime_spectrum_comap_is_right_inverse I⟩,
+end
+
+/--
+The canonical map from `prime_spectrum (localization.at_prime I.as_ideal)` to `set.Iic I`
+is bijective.
+-/
+lemma localization_prime_spectrum_comap_is_bijective :
+  function.bijective (localization_prime_spectrum_comap I) :=
+begin
+  rw function.bijective_iff_has_inverse,
+  use (localization_prime_spectrum_map I),
+  exact ⟨localization_prime_spectrum_comap_is_right_inverse I,
+    localization_prime_spectrum_comap_is_left_inverse I⟩,
+end
+
+/--
+The canonical map from `set.Iic I` to `prime_spectrum (localization.at_prime I.as_ideal)`
+is monotone.
+-/
+lemma localization_prime_spectrum_map_is_monotone :
+  monotone (localization_prime_spectrum_map I) :=
+by { intros J1 J2 H, dsimp, intros x hx, rw mem_ideal_image_span'_iff at *,
+  rcases hx with ⟨a, ⟨b, hab⟩⟩, use ⟨⟨a, H a.2⟩, ⟨b, hab⟩⟩, }
+
+/--
+The canonical map from `prime_spectrum (localization.at_prime I.as_ideal)` to `set.Iic I`
+is monotone.
+-/
+lemma localization_prime_spectrum_comap_is_monotone :
+  monotone (localization_prime_spectrum_comap I) :=
+by { intros J1 J2 H x hx, dsimp at *, exact H hx, }
+
+/--
+We can regard the canonical map from `set.Iic I` to `prime_spectrum (localization.at_prime I.as_ideal)`
+as an equivalence.
+-/
+@[simp]
+def localization_prime_spectrum_map_equiv :
+  (set.Iic I) ≃ (prime_spectrum (localization.at_prime I.as_ideal)) :=
+begin
+  fconstructor,
+  { exact localization_prime_spectrum_map I, },
+  { exact localization_prime_spectrum_comap I, },
+  { exact localization_prime_spectrum_comap_is_left_inverse I, },
+  { exact localization_prime_spectrum_comap_is_right_inverse I, },
+end
+
+/--
+We can regard the canonical map from `prime_spectrum (localization.at_prime I.as_ideal)` to
+`set.Iic I` as an equivalence.
+-/
+@[simp]
+def localization_prime_spectrum_comap_equiv :
+  (prime_spectrum (localization.at_prime I.as_ideal)) ≃ (set.Iic I) :=
+begin
+  fconstructor,
+  { exact localization_prime_spectrum_comap I, },
+  { exact localization_prime_spectrum_map I, },
+  { exact localization_prime_spectrum_comap_is_right_inverse I, },
+  { exact localization_prime_spectrum_comap_is_left_inverse I, },
+end
+
+/--
+`localization_prime_spectrum_map_equiv I` is monotone.
+-/
+lemma localization_prime_spectrum_map_equiv_is_monotone :
+  monotone (localization_prime_spectrum_map_equiv I) :=
+by { change monotone (λ (I' : ↥(set.Iic I)), (localization_prime_spectrum_map I I')),
+  exact localization_prime_spectrum_map_is_monotone I, }
+
+/--
+`localization_prime_spectrum_comap_equiv I` is monotone.
+-/
+lemma localization_prime_spectrum_comap_equiv_is_monotone :
+  monotone (localization_prime_spectrum_comap_equiv I) :=
+by { change monotone (λ I', localization_prime_spectrum_comap I I'),
+  exact localization_prime_spectrum_comap_is_monotone I, }
+
+lemma localization_prime_spectrum_comap_equiv_is_symm :
+  localization_prime_spectrum_comap_equiv I =
+    (localization_prime_spectrum_map_equiv I).symm :=
+by { fconstructor, }
+
+/--
+We have a canonical order isomorphism from `set.Iic I` to
+`prime_spectrum (localization.at_prime I.as_ideal`.
+-/
+@[simp]
+def localization_prime_spectrum_map_order_iso :
+  (set.Iic I) ≃o (prime_spectrum (localization.at_prime I.as_ideal)) :=
+begin
+  refine equiv.to_order_iso _ _ _,
+  { exact localization_prime_spectrum_map_equiv I, },
+  { exact localization_prime_spectrum_map_equiv_is_monotone I, },
+  { rw ←localization_prime_spectrum_comap_equiv_is_symm I,
+    exact localization_prime_spectrum_comap_equiv_is_monotone I, },
+end
+
+/--
+The height of `I` is equal to the krull dimension of `localization.at_prime I.as_ideal`.
+-/
+theorem prime_ideal_height_eq_ring_krull_dim_of_localization :
+  height I = ring_krull_dim (localization.at_prime I.as_ideal) := by
+{ exact krull_dim_eq_of_order_iso (localization_prime_spectrum_map_order_iso I), }
