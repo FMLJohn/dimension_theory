@@ -30,7 +30,12 @@ end
 
 lemma list.dedup_length_lt_of_not_nodup {X : Type*} [decidable_eq X] (l : list X) (h : ¬ l.nodup) :
   l.dedup.length < l.length :=
-sorry
+begin 
+  contrapose! h,
+  have h' := le_antisymm h (list.sublist.length_le (list.dedup_sublist _)),
+  rw ←list.dedup_eq_self,
+  exact list.sublist.eq_of_length (list.dedup_sublist _) h'.symm,
+end
 
 lemma list.dedup_ne_nil_of_ne_nil {X : Type*} [decidable_eq X] (l : list X) (h : l ≠ list.nil) :
   l.dedup ≠ list.nil := 
@@ -51,28 +56,121 @@ begin
   { dsimp, exact list.cons_ne_nil _ _ },
 end
 
-/-
-If two elements are adjecent in a deduped list, then they are adjecent in original one
+lemma list.le_of_chain_le {X : Type*} [decidable_eq X] [partial_order X]
+  (x : X) (l : list X) (l_chain : (x :: l).chain' (≤)) (y : X) (hy : y ∈ (x :: l)) :
+  x ≤ y :=
+begin 
+  rw list.mem_cons_iff at hy,
+  obtain (rfl|hy) := hy,
+  { refl },
+  rw list.mem_iff_nth_le at hy,
+  obtain ⟨n, hn, rfl⟩ := hy,
+  have s' : (x :: l).sorted (≤),
+  { rw list.chain'_iff_pairwise at l_chain,
+    exact l_chain, },
+  rw [show x = (x :: l).nth_le 0 (nat.zero_lt_succ _), from rfl, 
+    show l.nth_le n hn = (x :: l).nth_le n.succ (nat.succ_lt_succ hn), from rfl],
+  refine s'.nth_le_mono (_ : (⟨0, _⟩ : fin (x :: l).length) ≤ ⟨n.succ, _⟩),
+  exact nat.zero_le _,
+end
 
--/
-lemma list.is_adjecent_of_adjecent_in_dedup {X : Type*} [decidable_eq X] (l : list X)
-  (i : ℕ) (hi : i < l.dedup.length - 1) : 
-  ∃ (j : ℕ) (hj : j < l.length - 1), 
-    l.dedup.nth_le i (lt_of_lt_of_le hi $ nat.sub_le _ 1) = 
-    l.nth_le j (lt_of_lt_of_le hj $ nat.sub_le _ 1) ∧
-    l.dedup.nth_le (i + 1) (nat.lt_pred_iff.mp hi) = l.nth_le (j + 1) (nat.lt_pred_iff.mp hj) := 
-sorry
+lemma list.ge_of_chain_le {X : Type*} [decidable_eq X] [partial_order X]
+  (x : X) (l : list X) (l_chain : (x :: l).chain' (≤)) (y : X) (hy : y ∈ (x :: l)) :
+  y ≤ list.last (x :: l) (list.cons_ne_nil _ _)  :=
+begin 
+  have s' : (x :: l).sorted (≤),
+  { rw list.chain'_iff_pairwise at l_chain,
+    exact l_chain, },
+  rw list.mem_iff_nth_le at hy,
+  obtain ⟨m, hm, rfl⟩ := hy,
+  rw [list.last_eq_nth_le],
+  refine s'.nth_le_mono (_ : (⟨_, _⟩ : fin _) ≤ ⟨_, _⟩),
+  exact nat.lt_succ_iff.mp hm,
+end
+
+lemma list.dedup_head'_of_chain_wcovby {X : Type*} [decidable_eq X] [partial_order X]
+  (l : list X) (l_chain : l.chain' (⩿)) : l.dedup.head' = l.head' := 
+match l, l_chain with
+| [], _ := by simp
+| x0::l, l_chain := begin 
+  have ne_nil : (x0 :: l).dedup ≠ list.nil,
+  { apply list.dedup_ne_nil_of_ne_nil, exact list.cons_ne_nil _ _ },
+  obtain ⟨y, l', h⟩ : ∃ (y : X) (l' : list X), (x0 :: l).dedup = y :: l', 
+  { induction h : (x0 :: l).dedup with y l' ih,
+    { cases ne_nil h },
+    exact ⟨y, l', rfl⟩, },
+  rw [h, list.head', list.head'],
+  have h1 : ∀ (x : X) (hx : x ∈ y :: l'), y ≤ x,
+  { apply list.le_of_chain_le,
+    rw ← h,
+    exact list.chain'.sublist (l_chain.imp $ λ _ _, wcovby.le) (list.dedup_sublist _), },
+  have h2 : ∀ (x : X) (hx : x ∈ x0 :: l), x0 ≤ x := λ x hx, 
+    list.le_of_chain_le _ l (l_chain.imp $ λ _ _, wcovby.le) _ hx,
+  rw le_antisymm (h1 x0 begin 
+    rw [← h, list.mem_dedup],
+    exact list.mem_cons_self _ _,
+  end) (h2 y begin 
+    have mem1 : y ∈ y :: l' := list.mem_cons_self _ _,
+    rwa [← h, list.mem_dedup] at mem1,
+  end),
+end
+end
+
+lemma list.dedup_last_of_chain_wcovby {X : Type*} [decidable_eq X] [partial_order X] [inhabited X]
+  (l : list X) (l_chain : l.chain' (⩿)) (hl : l ≠ list.nil) :
+  l.dedup.last (list.dedup_ne_nil_of_ne_nil _ hl) = l.last hl := 
+begin 
+  obtain ⟨y, l', rfl⟩ : ∃ (y : X) (l' : list X), l = y :: l', 
+  { induction l with y l' ih,
+    { cases hl rfl },
+    exact ⟨y, l', rfl⟩, },
+  refine le_antisymm _ _,
+  { apply list.ge_of_chain_le _ _ (l_chain.imp $ λ _ _, wcovby.le),
+    rw ←list.mem_dedup, 
+    exact list.last_mem _ },
+  have ne_nil2 : (y :: l').dedup ≠ list.nil := list.dedup_ne_nil_of_ne_nil _ hl,
+  obtain ⟨x, l, hl⟩ : ∃ (x : X) (l : list X), x :: l = (y :: l').dedup,
+  { induction h : (y :: l').dedup with y l' ih,
+    { cases ne_nil2 h, },
+    exact ⟨_, _, rfl⟩, },
+  simp_rw ← hl,
+  refine list.ge_of_chain_le x l begin 
+    rw hl,
+    exact list.chain'.sublist (l_chain.imp $ λ _ _, wcovby.le) (list.dedup_sublist _),
+  end _ _,
+  rw [hl, list.mem_dedup],
+  exact list.last_mem _,
+end
+
+lemma list.dedup_head_of_chain_wcovby {X : Type*} [decidable_eq X] [partial_order X] [inhabited X]
+  (l : list X) (l_chain : l.chain' (⩿)) : l.dedup.head = l.head := 
+by rwa [list.head_eq_head', list.head_eq_head', list.dedup_head'_of_chain_wcovby]
+
+lemma list.dedup_chain'_wcovby_of_chain'_wcovby {X : Type*} [decidable_eq X] [partial_order X]
+  (l : list X) (l_chain : l.chain' (⩿)) : l.dedup.chain' (⩿) := 
+begin
+  induction l with x l ih,
+  { simp only [list.dedup_nil] },
+  { rw list.chain'_cons' at l_chain,
+    by_cases hx : x ∈ l,
+    { rw list.dedup_cons_of_mem hx,
+      exact ih l_chain.2 },
+    { rw list.dedup_cons_of_not_mem hx,
+      rw list.chain'_cons',
+      refine ⟨_, ih l_chain.2⟩,
+      rintros y (hy : _ = _), 
+      refine l_chain.1 y (eq.trans (l.dedup_head'_of_chain_wcovby l_chain.2).symm hy) },  },
+end
 
 lemma list.dedup_chain'_covby_of_chain'_wcovby {X : Type*} [decidable_eq X] [partial_order X]
-  (l : list X) (l_chain : l.chain' (⩿)) : l.dedup.chain' (⋖) :=
+  (l : list X) (l_chain : l.chain' (⩿)) : l.dedup.chain' (⋖) := 
 begin 
-  rw list.chain'_iff_nth_le at l_chain ⊢,
+  have c := list.dedup_chain'_wcovby_of_chain'_wcovby l l_chain,
+  rw list.chain'_iff_nth_le at c ⊢,
+  simp_rw [wcovby_iff_covby_or_eq] at c,
   intros i hi,
-  obtain ⟨j, hj, eq1, eq2⟩ := l.is_adjecent_of_adjecent_in_dedup i hi,
-  rw [eq1, eq2],
-  refine wcovby.covby_of_ne (l_chain j hj) _,
-  rw [←eq1, ←eq2],
-  exact (list.nodup.nth_le_inj_iff l.nodup_dedup _ _).not.mpr (by norm_num),
+  exact (c i hi).resolve_right (λ h, 
+    by linarith [list.nodup_iff_nth_le_inj.mp l.nodup_dedup _ _ _ _ h]),
 end
 
 lemma list.chain'_covby_of_chain'_wcovby_of_nodup {X : Type*} [decidable_eq X] [partial_order X]
@@ -83,14 +181,6 @@ begin
   rw ← l_nodup,
   exact list.dedup_chain'_covby_of_chain'_wcovby _ l_chain,
 end
-
-lemma list.dedup_head_of_chain_wcoby {X : Type*} [decidable_eq X] [partial_order X] [inhabited X]
-  (l : list X) (l_chain : l.chain' (⩿)) :
-  l.dedup.head = l.head := sorry
-
-lemma list.dedup_last_of_chain_wcoby {X : Type*} [decidable_eq X] [partial_order X] [inhabited X]
-  (l : list X) (l_chain : l.chain' (⩿)) (hl : l ≠ list.nil) :
-  l.dedup.last (list.dedup_ne_nil_of_ne_nil _ hl) = l.last hl := sorry
 
 section submodule
 
@@ -455,7 +545,7 @@ lemma of_inter0 (s0 : s 0 = ⊥) (slast : s ⟨s.length, lt_add_one _⟩ = ⊤)
 begin 
   rw [of_inter, of_list],
   dsimp,
-  rwa [list.nth_le_zero, list.dedup_head_of_chain_wcoby _ (inter_chain'_wcovby s N), 
+  rwa [list.nth_le_zero, list.dedup_head_of_chain_wcovby _ (inter_chain'_wcovby s N), 
     ←list.nth_le_zero, inter0_eq_bot],
 end
 
@@ -464,7 +554,7 @@ lemma of_inter_last (s0 : s 0 = ⊥) (slast : s ⟨s.length, lt_add_one _⟩ = �
 begin 
   rw [of_inter, of_list],
   dsimp,
-  rw [list.nth_le_length_sub_one, list.dedup_last_of_chain_wcoby _ (inter_chain'_wcovby s N), 
+  rw [list.nth_le_length_sub_one, list.dedup_last_of_chain_wcovby _ (inter_chain'_wcovby s N), 
     ←list.nth_le_length_sub_one],
   work_on_goal 2 { simp only [inter_length, nat.add_succ_sub_one, add_zero, lt_add_iff_pos_right, 
     nat.lt_one_iff], },
