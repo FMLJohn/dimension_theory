@@ -214,11 +214,9 @@ begin
     simp only [localization_prime_spectrum_comap, localization_prime_spectrum_map,
       subtype.val_eq_coe, subtype.coe_mk, ideal.mem_comap] at hx,
     rw mem_ideal_image_span'_iff at hx,
-    rcases hx with ⟨a, ⟨b, hab⟩⟩,
-    rcases a with ⟨a, ha⟩,
-    dsimp at ha,
+    rcases hx with ⟨⟨a, ha⟩, ⟨b, hab⟩⟩,
+    dsimp at ha hab,
     change localization.mk a 1 ∈ J.as_ideal at ha,
-    dsimp at hab,
     rw [←one_mul a, ←mul_one b, ←localization.mk_mul] at hab,
     rw hab,
     exact ideal.mul_mem_left J.as_ideal (localization.mk 1 b) ha, },
@@ -242,26 +240,20 @@ The canonical map from `set.Iic I` to `prime_spectrum (localization.at_prime I.a
 is bijective.
 -/
 lemma localization_prime_spectrum_map_is_bijective :
-  function.bijective (localization_prime_spectrum_map I) :=
-begin
-  rw function.bijective_iff_has_inverse,
-  use (localization_prime_spectrum_comap I),
-  exact ⟨localization_prime_spectrum_comap_is_left_inverse I,
-    localization_prime_spectrum_comap_is_right_inverse I⟩,
-end
+  function.bijective (localization_prime_spectrum_map I) := by
+{ rw function.bijective_iff_has_inverse, exact ⟨localization_prime_spectrum_comap I,
+  ⟨localization_prime_spectrum_comap_is_left_inverse I,
+    localization_prime_spectrum_comap_is_right_inverse I⟩⟩, }
 
 /--
 The canonical map from `prime_spectrum (localization.at_prime I.as_ideal)` to `set.Iic I`
 is bijective.
 -/
 lemma localization_prime_spectrum_comap_is_bijective :
-  function.bijective (localization_prime_spectrum_comap I) :=
-begin
-  rw function.bijective_iff_has_inverse,
-  use (localization_prime_spectrum_map I),
-  exact ⟨localization_prime_spectrum_comap_is_right_inverse I,
-    localization_prime_spectrum_comap_is_left_inverse I⟩,
-end
+  function.bijective (localization_prime_spectrum_comap I) := by
+{ rw function.bijective_iff_has_inverse, exact ⟨localization_prime_spectrum_map I,
+  ⟨localization_prime_spectrum_comap_is_right_inverse I,
+    localization_prime_spectrum_comap_is_left_inverse I⟩⟩, }
 
 /--
 The canonical map from `set.Iic I` to `prime_spectrum (localization.at_prime I.as_ideal)`
