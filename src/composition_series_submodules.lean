@@ -297,19 +297,6 @@ def inter_nth_le_to_qf (i : ℕ) (hi : i < s.length) :
   exact hx2.2,
 end
 
--- lemma inter_nth_le_to_qf_surj_of_nodup (h : (s.inter N).nodup) (i : ℕ) (hi : i < s.length) : 
---   function.surjective (s.inter_nth_le_to_qf N i hi) :=
--- begin 
---   intros z,
---   induction z using quotient.induction_on',
---   simp_rw [inter_nth_le_to_qf, linear_map.comp_apply, linear_map.restrict_apply, 
---     submodule.mkq_apply],
---   change ∃ _, _ = submodule.quotient.mk _,
---   simp_rw [submodule.quotient.eq, submodule.mem_comap, submodule.subtype_apply,
---     submodule.coe_sub, subtype.coe_mk],
-  
--- end
-
 lemma inter_nth_le_to_qf_ker (i : ℕ) (hi : i < s.length) :
   (s.inter_nth_le_to_qf N i hi).ker = 
   (submodule.comap 
@@ -491,20 +478,6 @@ begin
       exact le_refl _, },
     have := (h.nodup.nth_le_inj_iff _ _).mp eq2,
     norm_num at this, },
-  /-
-  N ⊓ s i ⋖ N ⊓ s (i + 1) as N-submodule
-  N ⊓ s i ≤ N ⊓ s (i + 1) as M-submodule
-  if N ⊓ s i = s i as M-submodule (i.e. s i ≤ N)
-  N ⊓ s i = s i ⋖ s (i + 1) as M-submodule
-  then N ⊓ s (i + 1) = s i as M-submodule or N ⊓ s (i + 1) = s (i + 1) as M-submodule
-
-  in latter case, nothing more to prove
-
-  in previous case, 
-    N ⊓ s (i + 1) = s i as N-module
-    s i = N ⊓ s i ⋖ s i as N-module contradiction
-    
-  -/
   { rw ← H,
     ext1,
     rw [submodule.mem_inf, submodule.mem_map, inter_nth_le _ _ _ hi],
@@ -596,17 +569,194 @@ begin
   { rwa inter0_eq_bot _ _ s0, },
 end
 
-def composition_series_of_le (s0 : s 0 = ⊥) (slast : s ⟨s.length, lt_add_one _⟩ = ⊤) : 
-  Σ' (s' : composition_series (submodule R N)), s' 0 = ⊥ ∧ s' ⟨s'.length, lt_add_one _⟩  = ⊤ :=
-  ⟨composition_series.of_list _ (s.inter_is_composition_series_aux N s0 slast).some_spec.some 
-    (s.inter_is_composition_series_aux N s0 slast).some_spec.some_spec.1, begin 
-      have := (s.inter_is_composition_series_aux N s0 slast).some_spec.some_spec.2.1,
-      dsimp [composition_series.of_list],
-      rwa list.nth_le_zero,
-    end, begin 
-      have := (s.inter_is_composition_series_aux N s0 slast).some_spec.some_spec.2.2,
-      dsimp [composition_series.of_list],
-      rwa list.nth_le_length_sub_one,
-    end⟩
+section classical
+
+variables (R M)
+open_locale classical
+
+def module_length : with_top ℕ :=
+if h : ∃ (s : composition_series (submodule R M)), s 0 = ⊥ ∧ s ⟨s.length, lt_add_one _⟩ = ⊤ 
+then h.some.length 
+else ⊤
+
+lemma module_length_eq_length 
+  (s : composition_series (submodule R M))
+  (s0 : s 0 = ⊥) (s_last : s ⟨s.length, lt_add_one _⟩ = ⊤) :
+  module_length R M = s.length :=
+begin 
+  delta module_length,
+  split_ifs with h,
+  { rw [with_top.coe_eq_coe],
+    refine (jordan_holder _ _ _ _).length_eq,
+    { rw [bot, bot, s0, h.some_spec.1], },
+    { erw [top, top, s_last, h.some_spec.2] }, },
+  { exact (h ⟨s, s0, s_last⟩).elim },
+end
+
+lemma module_length_lt_of_proper_submodule
+  (s : composition_series (submodule R M))
+  (s0 : s 0 = ⊥) (s_last : s ⟨s.length, lt_add_one _⟩ = ⊤)
+  (N : submodule R M) (hN : N < ⊤) :
+  module_length R N < module_length R M :=
+begin 
+  obtain ⟨x, x0, xlast, xlen⟩ := length_lt_of_lt s N s0 s_last hN,
+  rwa [module_length_eq_length R N x x0 xlast, module_length_eq_length R M s s0 s_last,
+    with_top.coe_lt_coe],
+end
+
+lemma module_length_congr
+  (s : composition_series (submodule R M))
+  (s0 : s 0 = ⊥) (s_last : s ⟨s.length, lt_add_one _⟩ = ⊤)
+  (M' : Type*) [add_comm_group M'] [module R M']
+  (e : M ≃ₗ[R] M') :
+  module_length R M = module_length R M' :=
+begin 
+  rw [module_length_eq_length R M s s0 s_last, module_length_eq_length R M' ⟨s.length, 
+    λ i, submodule.comap e.symm.to_linear_map (s i), begin 
+      intros i, 
+      change _ ⋖ _,
+      have H : _ ⋖ _ := s.step i,
+      rw covby_iff_quot_is_simple at H ⊢,
+      work_on_goal 2 
+      { exact submodule.comap_mono (s.strict_mono.monotone (le_of_lt $ fin.cast_succ_lt_succ _)), },
+      work_on_goal 2
+      { exact s.strict_mono.monotone (le_of_lt $ fin.cast_succ_lt_succ _) },
+      refine @@is_simple_module.congr _ _ _ _ _ _ H,
+      refine submodule.quotient.equiv _ _ _ _,
+      { refine ⟨λ x, ⟨e.symm x, x.2⟩, _, _, λ x, ⟨e x, show e.symm (e x) ∈ _, begin 
+          rw e.symm_apply_apply, exact x.2,
+        end⟩, _, _⟩,
+        { intros, ext, exact map_add _ _ _, },
+        { intros, ext, exact map_smul e.symm r _, },
+        { intros x, ext, exact e.apply_symm_apply _, },
+        { intros x, ext, exact e.symm_apply_apply _, }, },
+      { ext ⟨x, hx⟩,
+        rw [submodule.mem_map, submodule.mem_comap],
+        split,
+        { rintros ⟨y, hy1, hy2⟩,
+          rw [submodule.mem_comap, submodule.mem_comap, submodule.subtype_apply] at hy1,
+          rw [linear_equiv.coe_mk, subtype.ext_iff, subtype.coe_mk, subtype.coe_mk] at hy2,
+          rw [submodule.subtype_apply, submodule.coe_mk, ← hy2],
+          exact hy1 },
+        { intros hx,
+          rw [submodule.subtype_apply, submodule.coe_mk] at hx,
+          refine ⟨⟨e x, show e.symm (e x) ∈ _, by rwa e.symm_apply_apply⟩, _, _⟩,
+          { rwa [submodule.mem_comap, submodule.subtype_apply, subtype.coe_mk, submodule.mem_comap, 
+              linear_equiv.coe_to_linear_map, e.symm_apply_apply], },
+          { rw [linear_equiv.coe_mk, subtype.ext_iff, subtype.coe_mk, subtype.coe_mk, 
+              e.symm_apply_apply, subtype.coe_mk], }, }, },
+    end⟩],
+  { change submodule.comap _ _ = ⊥,
+    rw [s0, submodule.comap_bot],
+    exact linear_equiv.ker _, },
+  { change submodule.comap _ (s ⟨s.length, lt_add_one _⟩) = ⊤,
+    rw [s_last, submodule.comap_top], },
+end
+
+lemma module_length_lt_strict_mono
+  (s : composition_series (submodule R M))
+  (s0 : s 0 = ⊥) (s_last : s ⟨s.length, lt_add_one _⟩ = ⊤)
+  (N1 N2 : submodule R M) (hN : N1 < N2) :
+  module_length R N1 < module_length R N2 :=
+begin 
+  by_cases hN2 : N2 = ⊤,
+  { subst hN2, 
+    rw show module_length R (⊤ : submodule R M) = module_length R M, from 
+      (module_length_congr R M s s0 s_last (⊤ : submodule R M) submodule.top_equiv.symm).symm,
+    exact module_length_lt_of_proper_submodule R M s s0 s_last N1 hN, },
+  { replace hN2 : N2 < ⊤,
+    { rwa lt_top_iff_ne_top, },
+    obtain ⟨s2, s20, s2_last, s2_len⟩ := length_lt_of_lt s N2 s0 s_last hN2,
+    have lt' : (submodule.of_le $ le_of_lt hN).range < ⊤,
+    { obtain ⟨x, hx1, hx2⟩ := (set_like.lt_iff_le_and_exists.mp hN).2,
+      rw lt_top_iff_ne_top,
+      intros r,
+      have mem1 : (⟨x, hx1⟩ : N2) ∈ (⊤ : submodule R N2) := ⟨⟩,
+      rw [←r, linear_map.mem_range] at mem1,
+      obtain ⟨⟨y, hy1⟩, hy2⟩ := mem1,
+      rw [subtype.ext_iff, subtype.coe_mk] at hy2,
+      refine hx2 _,
+      rw ←hy2,
+      exact submodule.coe_mem _, },
+    obtain ⟨s1, s10, s1_last, s1_len⟩ := length_lt_of_lt s2 (submodule.of_le $ le_of_lt hN).range 
+      s20 s2_last lt',
+    rwa [module_length_eq_length R N2 s2 s20 s2_last, show module_length R N1 = 
+      module_length R (submodule.of_le $ le_of_lt hN).range, from _,
+      module_length_eq_length R _ s1 s10 s1_last, with_top.coe_lt_coe],
+    refine (module_length_congr R _ s1 s10 s1_last _ _).symm,
+    rw [submodule.range_of_le],
+    refine submodule.comap_subtype_equiv_of_le _,
+    exact le_of_lt hN, },
+end
+
+end classical
 
 end composition_series
+
+variables {R : Type*} [comm_ring R] {M : Type*} [add_comm_group M] [module R M]
+variables (s : composition_series (submodule R M))
+
+lemma strict_chain.length_le_composition_series_aux 
+  (s0 : s 0 = ⊥) (s_last : s ⟨s.length, lt_add_one _⟩ = ⊤)  
+  (x : strict_chain (submodule R M)) (x_last : x ⟨x.len, lt_add_one _⟩ = ⊤) : x.len ≤ s.length :=
+begin 
+  classical,
+  by_cases x_len : x.len = 0,
+  { rw x_len, norm_num, },
+  replace x_len : 0 < x.len,
+  { contrapose! x_len,
+    exact nat.eq_zero_of_le_zero x_len, },
+  have : ∀ (i : fin x.len), composition_series.module_length R (x (fin.cast_succ i)) <
+    composition_series.module_length R (x i.succ),
+  { intros i,
+    refine composition_series.module_length_lt_strict_mono R M s s0 s_last _ _ _,
+    refine x.strict_mono' _,
+    exact fin.cast_succ_lt_succ _, },
+  have aux1 : ∀ (i : fin x.len), ↑i ≤ composition_series.module_length R (x (fin.cast_succ i)),
+  { haveI : fact (0 < x.len) := ⟨x_len⟩,
+    refine fin.induction_of_zero_lt x.len _ _,
+    { norm_num },
+    { intros i hi ih,
+      specialize this ⟨i, lt_of_lt_of_le hi (by linarith)⟩,
+      have ineq1 : ((i : ℕ) : with_top ℕ) < _ := lt_of_le_of_lt ih this,
+      rw show fin.cast_succ (⟨i + 1, by linarith⟩ : fin x.len) = 
+        (⟨i, by linarith⟩ : fin x.len).succ, from rfl,
+      
+      induction H : composition_series.module_length R (x (⟨i, by linarith⟩ : fin x.len).succ) with L,
+      { exact le_top, },
+      change _ = ↑L at H,
+      rw H at *,
+      erw with_top.coe_le_coe,
+      erw with_top.coe_lt_coe at ineq1,
+      change (i + 1) ≤ L, 
+      rwa nat.succ_le_iff, } },
+  specialize aux1 ⟨x.len - 1, by linarith⟩,
+  have aux2 := lt_of_le_of_lt aux1 
+    (composition_series.module_length_lt_of_proper_submodule R M s s0 s_last _ _),
+  work_on_goal 2 
+  { rw ←x_last,
+    refine x.strict_mono' _,
+    convert fin.cast_succ_lt_succ _ using 1,
+    ext1,
+    dsimp,
+    linarith, },
+  rw composition_series.module_length_eq_length R M s s0 s_last at aux2,
+  erw with_top.coe_lt_coe at aux2,
+  change _ - 1 < _ at aux2,
+  linarith,
+end
+
+lemma strict_chain.length_le_composition_series
+  (s0 : s 0 = ⊥) (s_last : s ⟨s.length, lt_add_one _⟩ = ⊤)  
+  (x : strict_chain (submodule R M)) : x.len ≤ s.length :=
+begin 
+  by_cases x_last : x ⟨x.len, lt_add_one _⟩ = ⊤,
+  { apply strict_chain.length_le_composition_series_aux;
+    assumption, },
+  let x' := x.snoc ⊤ (lt_top_iff_ne_top.mpr x_last),
+  refine le_trans (le_of_lt (lt_add_one _ : x.len < x'.len)) (_ : x'.len ≤ _),
+  apply strict_chain.length_le_composition_series_aux,
+  { assumption },
+  { assumption },
+  exact strict_chain.snoc_last _ _ _,
+end

@@ -3,6 +3,8 @@ import tactic.linarith
 
 namespace fin
 
+instance has_zero.of_lt (n : ℕ) [fact $ 0 < n] : has_zero (fin n) :=
+@@fin.has_zero_of_ne_zero ⟨λ h, ne_of_lt (fact.out _) h.symm⟩
 
 instance has_one.of_le (n : ℕ) [fact $ 3 ≤ n] : has_one (fin n) :=
 @@fin.has_one_of_ne_zero ⟨begin 
@@ -40,5 +42,19 @@ def congr (m n : ℕ) (h : m = n) : fin m ≃o fin n :=
   left_inv := λ j, fin.ext rfl,
   right_inv := λ j, fin.ext rfl,
   map_rel_iff' := λ _ _, iff.rfl }
+
+@[elab_as_eliminator] def induction_of_zero_lt
+  (n : ℕ) [fact $ 0 < n]
+  {C : fin n → Sort*}
+  (h0 : C 0)
+  (hs : ∀ (i : ℕ) (hn : i < n - 1), C ⟨i, by linarith [fact.out $ 0 < n]⟩ → C ⟨i + 1, by linarith [fact.out $ 0 < n]⟩) :
+  Π (i : fin n), C i :=
+begin
+  haveI : ne_zero n := ⟨ne.symm $ ne_of_lt (fact.out _)⟩,
+  rintro ⟨i, hi⟩,
+  induction i with i IH,
+  { rwa [fin.mk_zero] },
+  { refine hs i (by rwa [←nat.pred_eq_sub_one, nat.lt_pred_iff]) (IH _), }
+end
 
 end fin
