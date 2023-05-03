@@ -299,6 +299,59 @@ def append (p q : strict_chain α) (h : p ⟨p.len, lt_add_one _⟩ < q 0) : str
         linarith, }, },
   end (order_iso.strict_mono _) }
 
+@[simps]
+def insert_nth (p : strict_chain α) (i : fin p.len) (a : α) (a_lt : p (fin.cast_succ i) < a)
+  (lt_a : a < p i.succ) : strict_chain α :=
+{ len := p.len + 1,
+  func := (fin.cast_succ i.succ).insert_nth_const a p,
+  strict_mono' := begin
+    intros m n h,
+    obtain (hm|rfl|hm) := lt_trichotomy m i.succ.cast_succ,
+    { rw fin.insert_nth_const_apply_below hm,
+      obtain (hn|rfl|hn) := lt_trichotomy n i.succ.cast_succ,
+      { rw fin.insert_nth_const_apply_below hn,
+        generalize_proofs h0 h1 h2 h3,
+        refine p.strict_mono' h, },
+      { rw fin.insert_nth_const_apply_same,
+        refine lt_of_le_of_lt _ a_lt,
+        refine p.strict_mono'.monotone _,
+        change m.1 < i.succ.val at h,
+        change m.1 ≤ i.val,
+        rw ←nat.lt_succ_iff,
+        convert h,
+        simp only [fin.val_eq_coe, fin.coe_succ], },
+      { rw fin.insert_nth_const_apply_above hn,
+        generalize_proofs h1 h2,
+        have ineq1 : p (m.cast_lt h1) < a := lt_of_le_of_lt (p.strict_mono'.monotone _) a_lt,
+        work_on_goal 2 
+        { change m.1 ≤ _,
+          change m.1 < _ at hm,
+          simp only [fin.val_eq_coe, fin.coe_cast_succ, fin.coe_succ] at hm ⊢,
+          linarith, },
+        refine lt_trans ineq1 (lt_of_lt_of_le lt_a $ p.strict_mono'.monotone _),
+        change i.succ.1 ≤ _,
+        simp only [fin.val_eq_coe, fin.coe_succ, fin.coe_pred],
+        change _ < n.1 at hn,
+        simp only [fin.val_eq_coe, fin.coe_cast_succ, fin.coe_succ] at hn,
+        rwa [nat.succ_le_iff, ←nat.pred_eq_sub_one, nat.lt_pred_iff, nat.succ_eq_add_one], }, },
+      { rw [fin.insert_nth_const_apply_same, fin.insert_nth_const_apply_above h],
+        refine lt_of_lt_of_le lt_a (p.strict_mono'.monotone _),
+        change i.succ.1 ≤ _,
+        simp only [fin.val_eq_coe, fin.coe_succ, fin.coe_pred],
+        change _ < n.1 at h,
+        simp only [fin.val_eq_coe, fin.coe_cast_succ, fin.coe_succ] at h,
+        rwa [nat.succ_le_iff, ←nat.pred_eq_sub_one, nat.lt_pred_iff, nat.succ_eq_add_one], },
+      { rw [fin.insert_nth_const_apply_above hm, fin.insert_nth_const_apply_above (hm.trans h)],
+        refine p.strict_mono' _,
+        change (m : ℕ) < n at h,
+        change  _ < m.1 at hm,
+        simp only [fin.val_eq_coe, fin.coe_cast_succ, fin.coe_succ] at hm,
+        change (_ : ℕ) < _,
+        simp only [fin.val_eq_coe, fin.coe_pred],
+        refine nat.pred_lt_pred _ h,
+        { change ↑m ≠ 0, linarith, }, },
+  end }
+
 /--
 For two pre-ordered sets `α, β`, if `f : α → β` is strictly monotonic, then a strict chain of `α` 
 can be pushed out to a strict chain of `β` by 

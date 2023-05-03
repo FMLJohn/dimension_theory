@@ -760,3 +760,52 @@ begin
   { assumption },
   exact strict_chain.snoc_last _ _ _,
 end
+
+variables {R M}
+
+structure strict_chain.is_composition_series (x : strict_chain (submodule R M)) : Prop :=
+(bot : x 0 = ⊥)
+(top : x ⟨x.len, lt_add_one _⟩ = ⊤)
+(step' : ∀ (i : fin x.len), x (fin.cast_succ i) ⋖ x i.succ)
+
+def strict_chain.to_composition_series (x : strict_chain (submodule R M))
+  (hx : x.is_composition_series) : composition_series (submodule R M) :=
+composition_series.of_list (list.of_fn x) (λ r, begin
+  rw list.eq_nil_iff_forall_not_mem at r,
+  refine r (x 0) _,
+  rw list.mem_of_fn,
+  exact ⟨_, rfl⟩,
+end) $ list.chain'_iff_nth_le.mpr $ λ i hi, show _ ⋖ _, begin
+  simp only [list.length_of_fn, list.length, nat.add_succ_sub_one, add_zero] at hi,
+  have eq1 := list.nth_le_of_fn x (⟨i, _⟩ : fin (x.len + 1)),
+  simp_rw fin.coe_mk at eq1,
+  have eq2 := list.nth_le_of_fn x (⟨i + 1, _⟩ : fin (x.len + 1)),
+  simp_rw fin.coe_mk at eq2,
+  rw [eq1, eq2],
+  exact hx.step' ⟨i, hi⟩,
+end
+
+lemma strict_chain.to_composition_series_length (x : strict_chain (submodule R M))
+  (hx : x.is_composition_series) : (x.to_composition_series hx).length = x.len :=
+begin 
+  delta strict_chain.to_composition_series composition_series.of_list,
+  dsimp,
+  rw list.length_of_fn,
+  simp only [nat.add_succ_sub_one, add_zero],
+end
+
+lemma strict_chain.to_composition_series_apply (x : strict_chain (submodule R M))
+  (hx : x.is_composition_series) (n) : (x.to_composition_series hx n) = x n :=
+begin 
+  delta strict_chain.to_composition_series composition_series.of_list,
+  dsimp,
+  rw list.nth_le_of_fn',
+  congr,
+  symmetry,
+  rw nat.mod_succ_eq_iff_lt,
+  refine lt_of_lt_of_le n.2 _,
+  delta strict_chain.to_composition_series,
+  rw composition_series.length_of_list,
+  refine nat.succ_le_succ _,
+  rw [←nat.pred_eq_sub_one, nat.pred_le_iff, list.length_of_fn],
+end

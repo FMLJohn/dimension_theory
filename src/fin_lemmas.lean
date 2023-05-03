@@ -1,4 +1,5 @@
 import data.fin.basic
+import data.fin.tuple.basic
 import tactic.linarith
 
 namespace fin
@@ -56,5 +57,38 @@ begin
   { rwa [fin.mk_zero] },
   { refine hs i (by rwa [←nat.pred_eq_sub_one, nat.lt_pred_iff]) (IH _), }
 end
+
+def insert_nth_const {n} {α : Type*} (i : fin (n + 1)) (x : α) 
+  (p : fin n → α) (j : fin (n + 1)) : α :=
+@fin.insert_nth n (λ _, α) i x p j
+
+lemma insert_nth_const_apply_above {n} {α : Type*}  
+  {i j : fin (n + 1)} (h : i < j) (x : α)
+  (p : fin n → α) :
+  i.insert_nth_const x p j = 
+  (p $ j.pred $ λ r, by { subst r, norm_num at h }) :=
+begin 
+  rw [insert_nth_const, insert_nth, succ_above_cases, dif_neg h.ne', dif_neg h.not_lt],
+  generalize_proofs h1 h2,
+  apply eq_of_heq ((eq_rec_heq _ _).trans _),
+  refl,
+end
+
+lemma insert_nth_const_apply_below {n} {α : Type*} 
+  {i j : fin (n + 1)} (h : j < i) (x : α)
+  (p : fin n → α) :
+  i.insert_nth_const x p j = 
+  (p $ j.cast_lt $ by { change (_ : ℕ) < _ at h, linarith [i.2, j.2, h], }) :=
+begin 
+  rw [insert_nth_const, insert_nth, succ_above_cases, dif_neg h.ne, dif_pos h],
+  generalize_proofs h1 h2,
+  apply eq_of_heq ((eq_rec_heq _ _).trans _),
+  refl,
+end
+
+@[simp] lemma insert_nth_const_apply_same  {n} {α : Type*}  
+  (i : fin (n + 1)) (x : α) (p : fin n → α) :
+  insert_nth_const i x p i = x :=
+by rw [insert_nth_const, insert_nth, succ_above_cases, dif_pos rfl]
 
 end fin
