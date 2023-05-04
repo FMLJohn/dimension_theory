@@ -809,3 +809,21 @@ begin
   refine nat.succ_le_succ _,
   rw [←nat.pred_eq_sub_one, nat.pred_le_iff, list.length_of_fn],
 end
+
+lemma strict_chain.to_composition_series_zero (x : strict_chain (submodule R M))
+  (hx : x.is_composition_series) : x.to_composition_series hx 0 = ⊥ :=
+begin 
+  rw x.to_composition_series_apply,
+  exact hx.bot,
+end
+
+lemma strict_chain.to_composition_series_last (x : strict_chain (submodule R M))
+  (hx : x.is_composition_series) : x.to_composition_series hx ⟨_, lt_add_one _⟩ = ⊤ :=
+begin 
+  rw x.to_composition_series_apply,
+  rw strict_chain.to_composition_series_length,
+  convert hx.top,
+  ext,
+  simp only [coe_coe, fin.coe_mk, fin.coe_of_nat_eq_mod, nat.mod_succ_eq_iff_lt],
+  exact lt_add_one _,
+end
